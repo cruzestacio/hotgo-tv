@@ -105,6 +105,11 @@
     '.' + PREFIX + '-thumb{width:100%;padding-top:56.25%;background:#222 center/cover no-repeat}',
     '.' + PREFIX + '-card-title{font-size:1vw;padding:.8vh .8vw;overflow:hidden;text-overflow:ellipsis;',
     '  white-space:nowrap;color:#ddd}',
+    '#' + PREFIX + '-toast{position:fixed;left:50%;bottom:6vh;transform:translateX(-50%);z-index:2147483647;',
+    '  background:rgba(20,20,26,.95);color:#fff;font:600 1.3vw Roboto,Arial,sans-serif;padding:1.4vh 2vw;',
+    '  border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none}',
+    '#' + PREFIX + '-toast.show{opacity:1}',
+    '.' + PREFIX + '-hero-meta{font-size:1.2vw;color:#ccc;margin:0 0 2vh}',
     '.' + PREFIX + '-hint{position:fixed;right:2vw;bottom:2vh;font-size:.9vw;color:#aaa;z-index:3;',
     '  background:rgba(0,0,0,.7);padding:.6vh 1vw;border-radius:4px}',
     'video.' + PREFIX + '-max{position:fixed !important;left:0 !important;top:0 !important;',
@@ -263,7 +268,7 @@
     } else {
       try { e.focus({ preventScroll: true }); } catch (err) { e.focus(); }
     }
-    if (home && home.contains(e)) scrollHome(e);
+    if (home && home.contains(e)) { scrollHome(e); heroFollow(e); }
     else scrollIntoView(e);
   }
 
@@ -411,8 +416,8 @@
     return out.join('&');
   }
 
-  function api(method, path, params, body) {
-    var token = accessToken();
+  function api(method, path, params, body, pub) {
+    var token = pub ? null : accessToken();
     params = params || {};
     params.r = API.reseller;
     var headers = {
@@ -490,7 +495,8 @@
     catalogLoading = true;
     var params = { dt: 'web', ln: lang(), cc: country() };
     var external = function () {
-      return api('GET', '/web/services/v3/external/tab-layout', params).then(parseLayout);
+      // o endpoint público só aceita o token público: com o Bearer do usuário ele recusa
+      return api('GET', '/web/services/v3/external/tab-layout', params, null, true).then(parseLayout);
     };
     // logado, o layout do usuário às vezes falha ou vem sem a home: aí vale o catálogo público,
     // que tem as mesmas linhas (antes caía na raspagem da página, com logos no lugar das capas)
@@ -790,6 +796,29 @@
     else window.location.href = card.href;
   }
 
+  // O destaque do topo mostra o vídeo focado (como na Netflix), com um respiro para não
+  // trocar a imagem a cada tecla quando a pessoa segura a seta
+  var heroItem = null;
+  var heroTimer = 0;
+  function showHero(hero, item) {
+    if (!hero || !item || item === heroItem) return;
+    heroItem = item;
+    hero.style.backgroundImage = 'url("' + (item.backdrop || item.img).replace(/"/g, '%22') + '")';
+    hero.querySelector('.' + PREFIX + '-hero-title').textContent = item.title;
+    var meta = [];
+    if (item.group) meta.push(item.group);
+    if (item.duration) meta.push(Math.round(item.duration / 60) + ' min');
+    hero.querySelector('.' + PREFIX + '-hero-meta').textContent = meta.join('  ·  ');
+  }
+
+  function heroFollow(e) {
+    if (!e || !e.tvfItem) return;
+    clearTimeout(heroTimer);
+    heroTimer = setTimeout(function () {
+      showHero(home && home.querySelector('.' + PREFIX + '-hero'), e.tvfItem);
+    }, 350);
+  }
+
   function indexGrid() {
     homeGrid.forEach(function (gridRow, r) {
       gridRow.forEach(function (e, c) {
@@ -816,25 +845,26 @@
 
     var bar = el('div', PREFIX + '-bar');
     bar.appendChild(el('span', PREFIX + '-logo', 'HOTGO'));
-    var btnSite = el('button', PREFIX + '-btn', 'Site completo');
-    btnSite.onclick = function () { closeHome(); firstFocus(); };
+    var btnSite = appMode() ? null : el('button', PREFIX + '-btn', 'Site completo');
+    if (btnSite) btnSite.onclick = function () { closeHome(); firstFocus(); };
     var btnReload = el('button', PREFIX + '-btn', 'Atualizar');
     btnReload.onclick = function () {
       if (onHotgo()) loadCatalog(function () { buildHome(); openHome(); });
       else { buildHome(); openHome(); }
     };
-    bar.appendChild(btnSite);
+    if (btnSite) bar.appendChild(btnSite);
     bar.appendChild(btnReload);
-    homeGrid = [[btnSite, btnReload]];
+    homeGrid = [btnSite ? [btnSite, btnReload] : [btnReload]];
     home.appendChild(bar);
 
-    var hint = el('div', PREFIX + '-hint', 'Menu/vermelho: Início  ·  Voltar: sair desta tela');
-    home.appendChild(hint);
+    if (!appMode()) home.appendChild(el('div', PREFIX + '-hint', 'Menu/vermelho: Início  ·  Voltar: sair desta tela'));
 
     if (!cards.length) {
       var empty = el('div', PREFIX + '-hero');
       var info = el('div', PREFIX + '-hero-info');
-      if (onHotgo()) {
+      if (onHotgo() && catalogLoading) {
+        info.appendChild(el('h1', PREFIX + '-hero-title', 'Carregando…'));
+      } else if (onHotgo()) {
         info.appendChild(el('h1', PREFIX + '-hero-title', 'Não consegui carregar o catálogo'));
         info.appendChild(el('p', null, 'Aperte "Atualizar" para tentar de novo.'));
       } else {
@@ -848,15 +878,17 @@
     }
 
     var hero = el('div', PREFIX + '-hero');
-    hero.style.backgroundImage = 'url("' + (cards[0].backdrop || cards[0].img).replace(/"/g, '%22') + '")';
     var heroInfo = el('div', PREFIX + '-hero-info');
-    heroInfo.appendChild(el('h1', PREFIX + '-hero-title', cards[0].title));
+    heroInfo.appendChild(el('h1', PREFIX + '-hero-title', ''));
+    heroInfo.appendChild(el('p', PREFIX + '-hero-meta', ''));
     var play = el('button', PREFIX + '-btn primary', '▶ Assistir');
-    play.onclick = function () { openCard(cards[0]); };
+    play.onclick = function () { openCard(heroItem); };
     heroInfo.appendChild(play);
     homeGrid.push([play]);
     hero.appendChild(heroInfo);
     scroll.appendChild(hero);
+    heroItem = null;
+    showHero(hero, cards[0]);
 
     var order = [];
     var groups = {};
@@ -883,6 +915,7 @@
         card.appendChild(thumb);
         card.appendChild(el('div', PREFIX + '-card-title', c.title));
         card.onclick = function () { openCard(c); };
+        card.tvfItem = c;
         rail.appendChild(card);
       });
       row.appendChild(track);
@@ -894,8 +927,13 @@
   }
 
   // Liga/desliga o modo em que só as telas do app aparecem
+  // Logado no hotgo.tv, o app é só a nossa interface: o site fica sempre escondido por baixo
+  function appMode() {
+    return onHotgo() && !!accessToken();
+  }
+
   function updateCover() {
-    var on = homeOpen || loginOpen || (!!player && maxVideo === player);
+    var on = appMode() || homeOpen || loginOpen || (!!player && maxVideo === player);
     document.documentElement.classList.toggle(PREFIX + '-cover', on);
   }
 
@@ -919,6 +957,7 @@
 
   function toggleHome() {
     if (loginOpen) closeCodeLogin();
+    if (homeOpen && appMode()) return;
     if (homeOpen) { closeHome(); firstFocus(); return; }
     buildHome();
     openHome();
@@ -1051,9 +1090,38 @@
       }
       return true;
     }
+    if (homeOpen && appMode()) return exitApp();
     if (homeOpen) { closeHome(); firstFocus(); return true; }
+    if (appMode() && !loginOpen) { buildHome(); openHome(); return true; }
     if (isTextInput(document.activeElement)) { document.activeElement.blur(); return true; }
     return false;
+  }
+
+  // No Início do app, Voltar duas vezes fecha o app (como Netflix/YouTube), sem passar pelo site
+  var exitArmed = 0;
+  function exitApp() {
+    if (Date.now() - exitArmed < 2000) {
+      if (window.HotGoNative && window.HotGoNative.exit) { window.HotGoNative.exit(); return true; }
+      try { window.tizen.application.getCurrentApplication().exit(); return true; } catch (err) { /* fora do Tizen */ }
+      return false;
+    }
+    exitArmed = Date.now();
+    toast('Aperte Voltar de novo para sair');
+    return true;
+  }
+
+  var toastTimer = 0;
+  function toast(text) {
+    var t = document.getElementById(PREFIX + '-toast');
+    if (!t) {
+      t = el('div');
+      t.id = PREFIX + '-toast';
+      document.body.appendChild(t);
+    }
+    t.textContent = text;
+    t.className = 'show';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.className = ''; }, 2000);
   }
 
   function onKey(e) {
@@ -1105,7 +1173,10 @@
     clearTimeout(autoTimer);
     autoTimer = setTimeout(function () {
       var path = window.location.pathname;
-      if (homeOpen || loginOpen || maxVideo || homeShownFor[path]) return;
+      if (homeOpen || loginOpen || maxVideo) return;
+      // no modo app o Início é a tela-base: qualquer página do site que fique por baixo vira o Início
+      if (appMode()) { buildHome(); openHome(); return; }
+      if (homeShownFor[path]) return;
       if (/login|entrar|signin|cadastro|checkout|assin|player|select-profile/i.test(path)) return;
       // com o catálogo da API, o Início só abre sozinho na página inicial do site
       if (catalog && !/^\/([a-z]{2}\/?)?(home|main|browse)?\/?$/.test(path)) return;
@@ -1125,7 +1196,12 @@
         if (!home || !home.contains(muts[i].target)) { pointerDirty = true; maybeAutoHome(); return; }
       }
     }).observe(document.body, { childList: true, subtree: true });
-    loadCatalog(function () { maybeAutoHome(); });
+    updateCover();
+    if (appMode()) { buildHome(); openHome(); }
+    loadCatalog(function () {
+      // o Início do modo app já estava aberto com "Carregando…": refaz com o catálogo
+      if (appMode() && homeOpen) { buildHome(); openHome(); } else maybeAutoHome();
+    });
     // sem sessão, o app começa pelo login por código (a não ser que a pessoa tenha pedido e-mail e senha)
     var emailLogin = false;
     try { emailLogin = window.sessionStorage.getItem('tvfEmailLogin') === '1'; } catch (err) { emailLogin = false; }
@@ -1135,7 +1211,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.5.1',
+    version: '0.6.0',
     openItem: openItem,
     codeLogin: openCodeLogin,
     reloadCatalog: loadCatalog,

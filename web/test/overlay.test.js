@@ -112,6 +112,25 @@ async function apiScenario(browser) {
   assert.strictEqual(await page.$eval('#tvf-player', (v) => v.style.display), 'none');
   assert.strictEqual(await page.$eval('#tvf-home', (h) => h.classList.contains('open')), true);
 
+  // modo app (logado): sem botão do site, o destaque segue o foco, e Voltar no Início não mostra o site
+  assert.ok(!(await page.$$eval('.tvf-bar .tvf-btn', (b) => b.map((x) => x.textContent))).includes('Site completo'));
+  await press(page, 'ArrowDown');
+  await press(page, 'ArrowRight');
+  await page.waitForTimeout(500);
+  const heroTitle = await page.$eval('.tvf-hero-title', (h) => h.textContent);
+  assert.strictEqual(heroTitle, await focused(page));
+  await page.evaluate(() => {
+    window.exited = 0;
+    window.HotGoNative = { exit: () => { window.exited++; } };
+  });
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 10009, bubbles: true })));
+  await page.waitForTimeout(100);
+  assert.strictEqual(await page.$eval('#tvf-home', (h) => h.classList.contains('open')), true);
+  assert.strictEqual(await page.$eval('#tvf-toast', (t) => t.className), 'show');
+  assert.strictEqual(await page.$eval('#enquete', (e) => e.offsetParent === null), true);
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 10009, bubbles: true })));
+  assert.strictEqual(await page.evaluate(() => window.exited), 1);
+
   assert.deepStrictEqual(errors, []);
   await page.close();
 }

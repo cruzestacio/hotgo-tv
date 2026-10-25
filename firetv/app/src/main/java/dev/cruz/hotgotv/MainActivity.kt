@@ -182,6 +182,12 @@ class MainActivity : Activity() {
             runOnUiThread { PlayerActivity.start(this@MainActivity, url, title.orEmpty()) }
             return true
         }
+
+        // Voltar duas vezes no Início do overlay fecha o app em vez de voltar pelo histórico do site
+        @JavascriptInterface
+        fun exit() {
+            runOnUiThread { finish() }
+        }
     }
 
     private fun isHotgoHost(host: String) = host == "hotgo.tv" || host.endsWith(".hotgo.tv")
