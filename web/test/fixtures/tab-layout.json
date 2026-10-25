@@ -4,7 +4,9 @@
   {
    "id": "a",
    "type": "category_layout",
-   "namePt": "Outro"
+   "namePt": "Outro",
+   "categoryId": "catOutro",
+   "order": 0
   },
   {
    "id": "b",

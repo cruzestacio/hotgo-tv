@@ -55,3 +55,11 @@ hotgo.tv, *.streann.tech, *.streann.com, streann.akamaized.net
 - `tab-layout` depende do `dt`: `web` → "Web only _Brazil", `androidTv` → "Android TV" (8 abas), `fireTv` → vazio
   (por isso o app oficial mostra "Indisponível para sua região" no Fire TV). Sem o header `Origin: https://www.hotgo.tv`,
   a chamada pública responde 500 "unauthorized!".
+
+## Menu, canais, categorias e busca (usados a partir da 0.7.0)
+
+- Canais do menu: layouts `type: "category_layout"` do tab-layout, com `categoryId`, `order`, `icon` e `namePt`. Os que vêm sem nome usam o nome do atalho de marca (categoria `type: "layout"` da home) na mesma posição (`order`).
+- Vídeos de um canal ou categoria: `GET /web/services/{user|external}/vods/category-paged?categoryIds=<id>&page=<0..>&pageSize=30&viewAllPage=true&device-type=web&ln=pt` → `{page, pageSize, totalItems, items[]}`. O título fica em `items[].videoOnDemandInfos[].title`. `page` começa em 0.
+- Categorias: `GET /web/services/v3/external/reseller-web-categories?ln=pt` → lista com `id`, `type`, `isActive`, `showOnWeb`, `categoryInfos[].name`.
+- Busca: `POST /web/services/external/search/content` (form `device-type=web&query=...`) → lista de vídeos com `name` e `image`.
+- Os endpoints `external` só aceitam o token público; com o Bearer do usuário respondem 401.

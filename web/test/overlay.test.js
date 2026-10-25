@@ -43,6 +43,22 @@ async function apiScenario(browser) {
     // o layout do usuário falhando: o Início tem que vir do catálogo público
     if (u.pathname.endsWith('/user/tab-layout')) return r.fulfill({ status: 500, headers: cors(), body: '{}' });
     if (u.pathname.endsWith('/tab-layout')) return r.fulfill({ headers: cors(), path: fixture });
+    if (u.pathname.endsWith('/vods/category-paged')) {
+      const pg = Number(u.searchParams.get('page'));
+      const items = Array.from({ length: 30 }, (_, i) => ({
+        id: 'c' + pg + '-' + i, type: 'vod', showOnWeb: true, image: 'https://img.example/c.jpg',
+        videoOnDemandInfos: [{ languageCode: 'pt', title: 'Canal ' + (pg * 30 + i + 1) }]
+      }));
+      return r.fulfill({ headers: cors(), json: { page: pg, pageSize: 30, totalItems: 45, items: pg === 0 ? items : items.slice(0, 15) } });
+    }
+    if (u.pathname.endsWith('/reseller-web-categories')) {
+      return r.fulfill({ headers: cors(), json: [
+        { id: 'k1', type: 'vod', isActive: true, showOnWeb: true, categoryInfos: [{ languageCode: 'pt', name: 'Loiras' }] },
+        { id: 'k2', type: 'vod', isActive: false, categoryInfos: [{ languageCode: 'pt', name: 'Oculta' }] }] });
+    }
+    if (u.pathname.endsWith('/search/content')) {
+      return r.fulfill({ headers: cors(), json: [{ id: 's1', type: 'vod', name: 'Achado ' + new URLSearchParams(req.postData()).get('query'), image: 'https://img.example/s.jpg' }] });
+    }
     if (u.pathname.endsWith('/check-access')) return r.fulfill({ headers: cors(), json: { hasAccess: true } });
     if (u.pathname.endsWith('/playlist.m3u8')) {
       return r.fulfill({ headers: cors(), json: { url: 'https://cfvod.example/' + u.pathname.split('/')[5] + '/hls/master.m3u8' } });
@@ -130,6 +146,50 @@ async function apiScenario(browser) {
   assert.strictEqual(await page.$eval('#enquete', (e) => e.offsetParent === null), true);
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 10009, bubbles: true })));
   assert.strictEqual(await page.evaluate(() => window.exited), 1);
+  await page.evaluate(() => { delete window.HotGoNative; });
+
+  // menu lateral estilo Netflix: esquerda no primeiro card abre o menu com Buscar, Início, canais e Categorias
+  await press(page, 'ArrowLeft', 3);
+  assert.strictEqual(await page.$eval('#tvf-home', (h) => h.classList.contains('tvf-nav-open')), true);
+  const navLabels = await page.$$eval('.tvf-nav-label', (l) => l.map((x) => x.textContent));
+  assert.deepStrictEqual(navLabels, ['Buscar', 'Início', 'Outro', 'Categorias']);
+  assert.match(await focused(page), /Início/);
+  // canal: grade de 5 colunas, carrega mais vídeos perto do fim e Voltar volta ao Início
+  await press(page, 'ArrowDown');
+  await press(page, 'Enter');
+  await page.waitForFunction(() => document.querySelectorAll('.tvf-card').length === 30, null, { timeout: 3000 });
+  assert.strictEqual(await page.$eval('.tvf-page-title', (h) => h.textContent), 'Outro');
+  assert.strictEqual(await focused(page), 'Canal 1');
+  await press(page, 'ArrowDown', 5);
+  await page.waitForFunction(() => document.querySelectorAll('.tvf-card').length === 45, null, { timeout: 3000 });
+  await press(page, 'ArrowRight', 2);
+  assert.strictEqual(await focused(page), 'Canal 28');
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 10009, bubbles: true })));
+  await page.waitForTimeout(100);
+  assert.strictEqual(await page.$$eval('.tvf-hero', (h) => h.length), 1);
+  // categorias: só as ativas; abrir uma mostra os vídeos dela, e Voltar volta para Categorias
+  await press(page, 'ArrowLeft', 3);
+  await press(page, 'ArrowDown', 2);
+  await press(page, 'Enter');
+  await page.waitForFunction(() => document.querySelectorAll('.tvf-tile').length === 1, null, { timeout: 3000 });
+  assert.strictEqual(await focused(page), 'Loiras');
+  await press(page, 'Enter');
+  await page.waitForFunction(() => (document.querySelector('.tvf-page-title') || {}).textContent === 'Loiras', null, { timeout: 3000 });
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 10009, bubbles: true })));
+  await page.waitForTimeout(100);
+  assert.strictEqual(await page.$eval('.tvf-page-title', (h) => h.textContent), 'Categorias');
+  // busca com o teclado na tela
+  await press(page, 'ArrowLeft', 3);
+  await press(page, 'ArrowUp', 5);
+  await press(page, 'Enter');
+  assert.strictEqual(await focused(page), 'a');
+  await press(page, 'Enter');
+  await press(page, 'ArrowRight');
+  await press(page, 'Enter');
+  assert.strictEqual(await page.$eval('#tvf-search-box', (b) => b.textContent), 'ab');
+  await page.waitForFunction(() => document.querySelectorAll('.tvf-results .tvf-card').length === 1, null, { timeout: 3000 });
+  assert.strictEqual(await page.$eval('.tvf-results .tvf-card-title', (t) => t.textContent), 'Achado ab');
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'search.png') });
 
   assert.deepStrictEqual(errors, []);
   await page.close();
