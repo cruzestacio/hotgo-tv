@@ -549,9 +549,13 @@
       body: body ? query(body) : undefined
     }).then(function (res) {
       if (!res.ok) {
-        var err = new Error('HTTP ' + res.status + ' em ' + path);
-        err.status = res.status;
-        throw err;
+        // o corpo do erro diz o motivo (ex.: code 628 = limite de aparelhos assistindo ao mesmo tempo)
+        return res.text().then(function (text) {
+          var err = new Error('HTTP ' + res.status + ' em ' + path + ' ' + (text || '').slice(0, 200));
+          err.status = res.status;
+          try { err.body = JSON.parse(text); } catch (e) { err.body = null; }
+          throw err;
+        });
       }
       return res.json();
     });
@@ -887,7 +891,26 @@
   }
 
   // O player (nativo ou o nosso <video>) avisa onde parou; quase no fim conta como assistido
+  // Como o site ao sair do player: libera a vaga de "aparelho assistindo" da conta.
+  // Sem isso cada vídeo aberto fica contando até expirar e a conta bate no limite.
+  function stopActivePlayer(posSec) {
+    if (!accessToken()) return Promise.resolve();
+    var profile = store('accountProfileId');
+    var path = '/web/services/user/stop-active-player';
+    return api('POST', path, profile ? { accountProfileId: profile } : {}, {
+      deviceOs: 'web', deviceType: 'web', 'stop-index': Math.floor(posSec || 0), deviceId: deviceId()
+    }).catch(function (err) {
+      if (window.console) console.warn('[hotgoTV] stop-active-player falhou:', err.message);
+    });
+  }
+
+  function tooManyDevices(err, access) {
+    var b = (err && err.body) || {};
+    return b.code === 628 || /max sim|simultaneous/i.test((b.message || '') + ' ' + ((access && access.message) || ''));
+  }
+
   function playerClosed(posMs, durMs) {
+    stopActivePlayer((Number(posMs) || 0) / 1000);
     if (!lastPlayed) return;
     var pos = Math.max(0, Number(posMs) || 0) / 1000;
     var dur = Math.max(0, Number(durMs) || 0) / 1000;
@@ -917,12 +940,9 @@
     if (!window.HotGoNative && !canPlayHls()) { sitePlayer(item); return; }
     var dataType = item.type === 'vod' ? 'videoondemand' : item.type;
     var denied = false;
-    api('POST', '/web/services/user-v2/check-access', { isFromTabLayout: true }, {
-      dataId: item.id, dataType: dataType, 'device-id': deviceId()
-    }).then(function (access) {
-      // o check-access às vezes nega e o playlist libera mesmo assim: quem decide é o playlist
-      denied = !!(access && access.hasAccess === false);
-      if (denied && window.console) console.warn('[hotgoTV] check-access negou:', JSON.stringify(access).slice(0, 400));
+    var access0 = null;
+    var retried = false;
+    var playlist = function () {
       return api('GET', '/loadbalancer/services/v1/' + item.type + 's-secure/' + item.id + '/playlist.m3u8', {
         access_token: accessToken(),
         'device-id': deviceId(),
@@ -931,7 +951,21 @@
         withCredentials: 'false',
         doNotUseRedirect: 'true',
         country_code: country().toUpperCase()
+      }).catch(function (err) {
+        // a vaga pode ser deste mesmo aparelho (vídeo anterior não liberado): libera e tenta uma vez
+        if (retried || !tooManyDevices(err, access0)) throw err;
+        retried = true;
+        return stopActivePlayer(0).then(playlist);
       });
+    };
+    api('POST', '/web/services/user-v2/check-access', { isFromTabLayout: true }, {
+      dataId: item.id, dataType: dataType, 'device-id': deviceId()
+    }).then(function (access) {
+      // o check-access às vezes nega e o playlist libera mesmo assim: quem decide é o playlist
+      access0 = access;
+      denied = !!(access && access.hasAccess === false);
+      if (denied && window.console) console.warn('[hotgoTV] check-access negou:', JSON.stringify(access).slice(0, 400));
+      return playlist();
     }).then(function (res) {
       if (!res || !res.url) throw new Error('playlist sem url');
       playUrl(res.url, item.title, start);
@@ -944,8 +978,12 @@
       // no modo app o site fica escondido (e o player dele quebra sem o <video>): avisa e fica no Início
       if (appMode()) {
         if (!homeOpen) { buildHome(); openHome(); }
-        toast(denied || err.status === 403 ? 'Este vídeo não está liberado na sua assinatura'
-          : 'Não consegui abrir este vídeo. Tente de novo.');
+        if (tooManyDevices(err, access0)) {
+          toast('Sua conta atingiu o limite de aparelhos assistindo ao mesmo tempo. Feche o HotGo em outro aparelho e tente de novo.', 7000);
+        } else {
+          toast(denied || err.status === 403 ? 'Este vídeo não está liberado na sua assinatura'
+            : 'Não consegui abrir este vídeo. Tente de novo.', 5000);
+        }
         return;
       }
       sitePlayer(item);
@@ -1871,7 +1909,7 @@
   }
 
   var toastTimer = 0;
-  function toast(text) {
+  function toast(text, ms) {
     var t = document.getElementById(PREFIX + '-toast');
     if (!t) {
       t = el('div');
@@ -1881,7 +1919,7 @@
     t.textContent = text;
     t.className = 'show';
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.className = ''; }, 2000);
+    toastTimer = setTimeout(function () { t.className = ''; }, ms || 2000);
   }
 
   function onKey(e) {
@@ -1984,7 +2022,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.11.2',
+    version: '0.11.3',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,

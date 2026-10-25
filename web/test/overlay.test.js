@@ -327,6 +327,17 @@ async function slowCatalogScenario(browser) {
   await page.waitForFunction(() => /assinatura/.test((document.getElementById('tvf-toast') || {}).textContent || ''), null, { timeout: 3000 });
   assert.match(page.url(), /\/pt\/home$/);
   assert.strictEqual(await page.$eval('#tvf-home', (h) => h.classList.contains('open')), true);
+
+  // limite de aparelhos (code 628): libera a vaga deste aparelho, tenta de novo e só então avisa
+  let stops = 0;
+  await page.route('https://cf.streann.tech/**/stop-active-player**', (r) => { stops++; return r.fulfill({ headers: cors(), json: {} }); });
+  await page.unroute('https://cf.streann.tech/**/playlist.m3u8**');
+  await page.route('https://cf.streann.tech/**/playlist.m3u8**', (r) => r.fulfill({ status: 400, headers: cors(),
+    json: { code: 628, message: 'User x has reached max sim devices' } }));
+  await page.evaluate(() => { document.getElementById('tvf-toast').textContent = ''; });
+  await press(page, 'Enter');
+  await page.waitForFunction(() => /limite de aparelhos/.test((document.getElementById('tvf-toast') || {}).textContent || ''), null, { timeout: 3000 });
+  assert.strictEqual(stops, 1);
   assert.deepStrictEqual(errors, []);
   await page.close();
   console.log('ok: catálogo lento');
