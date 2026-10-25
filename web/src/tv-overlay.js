@@ -29,6 +29,8 @@
     appName: 'hotgo',
     // login por código (hotgo.tv/tv), o mesmo do app oficial de Android TV
     tvBase: 'https://api.streann.tech/web/',
+    // Basic do login do site (loginAuthorization no bundle), usado também para renovar a sessão
+    loginAuth: 'NjZiNzQxOTQ0OTM5NzAxMjI3YjQ1YjYwODFkN2UwOWQ4MWFiMTdkNGQ4OGQ0YzIyODAzNjgwMDYwMWE2OjI0ODY2YTcwYzUyNjY4ZmYxODE5Zjk5YjA3MGFkNWU2NmIyNjAzNzY5OTM4NmQ4Y2FjMmFmOTYwNjA2NQ==',
     tvAuth: '836d9c49e641d736ab6c96e2bae922d8abf8a41477b535e04f4239b83d2fc3b1',
     codeTtl: 5 * 60 * 1000,
     pollEvery: window.hotgoTVPollEvery || 4000
@@ -532,7 +534,45 @@
     return out.join('&');
   }
 
-  function api(method, path, params, body, pub) {
+  // A sessão do login por código dura pouco: renova com o refresh_token antes de vencer,
+  // para a TV continuar logada sem pedir código de novo
+  var refreshing = null;
+  function refreshSession() {
+    if (refreshing) return refreshing;
+    var rt = store('refresh_token');
+    if (!rt || rt === 'null') return Promise.reject(new Error('sem refresh_token'));
+    refreshing = fetch(API.base + '/web/oauth/token?r=' + API.reseller, {
+      method: 'POST',
+      headers: { 'Authorization': 'Basic ' + API.loginAuth, 'Content-Type': 'application/x-www-form-urlencoded',
+        'x-app-name': API.appName, 'x-app-platform': 'web' },
+      body: query({ scope: 'services', grant_type: 'refresh_token', refresh_token: rt })
+    }).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' ao renovar a sessão');
+      return res.json();
+    }).then(function (token) {
+      if (!token || !token.access_token) throw new Error('renovação sem access_token');
+      storeSession(token);
+      if (window.console) console.log('[hotgoTV] sessão renovada');
+      refreshing = null;
+      return token.access_token;
+    }, function (err) {
+      refreshing = null;
+      if (window.console) console.warn('[hotgoTV] não consegui renovar a sessão:', err.message);
+      throw err;
+    });
+    return refreshing;
+  }
+
+  function sessionExpiresSoon() {
+    var exp = Number(store('exp')) || 0;
+    return !!accessToken() && exp > 0 && Date.now() > exp - 10 * 60 * 1000;
+  }
+
+  function keepSessionFresh() {
+    if (sessionExpiresSoon()) refreshSession().catch(function () { /* tenta de novo no próximo ciclo */ });
+  }
+
+  function api(method, path, params, body, pub, retried) {
     var token = pub ? null : accessToken();
     params = params || {};
     params.r = API.reseller;
@@ -548,6 +588,10 @@
       headers: headers,
       body: body ? query(body) : undefined
     }).then(function (res) {
+      // token vencido: renova uma vez e repete a chamada
+      if (res.status === 401 && token && !retried && store('refresh_token')) {
+        return refreshSession().then(function () { return api(method, path, params, body, pub, true); });
+      }
       if (!res.ok) {
         // o corpo do erro diz o motivo (ex.: code 628 = limite de aparelhos assistindo ao mesmo tempo)
         return res.text().then(function (text) {
@@ -808,10 +852,7 @@
     }, API.pollEvery);
   }
 
-  // Grava a sessão como o site faz (authService.setSession) e recarrega já logado
-  function saveSession(token) {
-    clearInterval(loginTick);
-    setText('code-status', 'Conectado! Carregando…');
+  function storeSession(token) {
     var expiresIn = token.expires_in || 3600;
     try {
       var ls = window.localStorage;
@@ -824,6 +865,13 @@
       ls.setItem('exp', String(Date.now() + expiresIn * 1000));
       if (token.accountProfileId) ls.setItem('accountProfileId', token.accountProfileId);
     } catch (err) { /* sem storage */ }
+  }
+
+  // Grava a sessão como o site faz (authService.setSession) e recarrega já logado
+  function saveSession(token) {
+    clearInterval(loginTick);
+    setText('code-status', 'Conectado! Carregando…');
+    storeSession(token);
     var go = function () {
       closeCodeLogin();
       window.location.href = window.location.origin + '/' + lang() + '/home';
@@ -2012,6 +2060,7 @@
     }
     // começa a carregar antes de montar o Início, para ele já nascer com "Carregando…"
     loadCatalog(catalogArrived);
+    if (onHotgo()) { keepSessionFresh(); setInterval(keepSessionFresh, 5 * 60 * 1000); }
     if (appMode()) { buildHome(); openHome(); }
     // sem sessão, o app começa pelo login por código (a não ser que a pessoa tenha pedido e-mail e senha)
     var emailLogin = false;
@@ -2022,7 +2071,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.11.3',
+    version: '0.11.4',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,
