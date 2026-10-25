@@ -78,6 +78,7 @@ async function apiScenario(browser) {
     // Chromium do Playwright não toca HLS; nas TVs o player nativo toca
     HTMLMediaElement.prototype.canPlayType = () => 'maybe';
     HTMLMediaElement.prototype.play = function () { return Promise.resolve(); };
+    window.hotgoTVKeepOnError = true;
   });
   await page.goto('https://www.hotgo.tv/pt/home');
   await page.addScriptTag({ content: OVERLAY });

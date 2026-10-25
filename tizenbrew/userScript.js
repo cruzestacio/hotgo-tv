@@ -1114,6 +1114,8 @@
       player.addEventListener('error', function () {
         if (!player.getAttribute('src')) return;
         if (window.console) console.warn('[hotgoTV] erro no vídeo', player.error && player.error.code);
+        // nos testes (Chromium sem HLS) o vídeo sempre falha: lá o player fica aberto
+        if (window.hotgoTVKeepOnError) return;
         toast('Não consegui tocar este vídeo. Tente de novo.', 5000);
         if (maxVideo === player) back();
       });
