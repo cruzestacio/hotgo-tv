@@ -98,7 +98,7 @@ async function apiScenario(browser) {
   });
   assert.ok(look.f, 'nenhum card focado');
   assert.strictEqual(look.title, 'rgb(229, 9, 20)');
-  assert.ok(Number(look.op) > Number(look.otherOp));
+  assert.ok(look.f);
   await press(page, 'Enter');
   await page.waitForFunction(() => {
     const v = document.getElementById('tvf-player');

@@ -81,8 +81,7 @@
     '#' + PREFIX + '-scroll{position:absolute;left:0;top:0;right:0;will-change:transform;',
     '  transition:transform .2s ease-out;animation:' + PREFIX + '-in .25s ease-out}',
     // destaque como na Netflix: imagem grande, escurecida à esquerda e embaixo, troca com fade
-    '.' + PREFIX + '-hero{position:relative;height:62vh;background:#000 center top/cover no-repeat;',
-    '  transition:background-image .4s ease-in-out}',
+    '.' + PREFIX + '-hero{position:relative;height:62vh;background:#000 center top/cover no-repeat}',
     '.' + PREFIX + '-hero:before{content:"";position:absolute;left:0;top:0;bottom:0;width:70%;',
     '  background:linear-gradient(90deg,#141414 0,rgba(20,20,20,.75) 35%,transparent 100%)}',
     '.' + PREFIX + '-hero:after{content:"";position:absolute;left:0;right:0;bottom:0;height:45%;',
@@ -107,9 +106,9 @@
     '.' + PREFIX + '-rail{display:flex;padding:0 4vw;white-space:nowrap;will-change:transform;',
     '  transition:transform .2s ease-out}',
     '.' + PREFIX + '-card{position:relative;flex:0 0 auto;width:18vw;margin-right:.8vw;border-radius:4px;overflow:hidden;',
-    '  background:#232323;opacity:.7;transition:transform .15s ease-out,opacity .15s}',
+    '  background:#232323;transition:transform .15s ease-out}',
     // card focado: cresce um pouco, moldura branca por dentro e título em destaque
-    '.' + PREFIX + '-card.' + PREFIX + '-focus{outline:none !important;opacity:1;z-index:2;transform:scale(1.08)}',
+    '.' + PREFIX + '-card.' + PREFIX + '-focus{outline:none !important;z-index:2;transform:scale(1.08)}',
     '.' + PREFIX + '-card.' + PREFIX + '-focus:after{content:"";position:absolute;left:0;top:0;right:0;bottom:0;',
     '  border:.35vw solid #fff;border-radius:6px;pointer-events:none}',
     '.' + PREFIX + '-card.' + PREFIX + '-focus .' + PREFIX + '-card-title{background:#e50914;color:#fff;font-weight:700}',
@@ -118,10 +117,9 @@
     '  white-space:nowrap;color:#ddd}',
     // menu lateral: recolhido mostra só os ícones; com o foco nele, abre com os nomes
     '.' + PREFIX + '-nav{position:absolute;left:0;top:0;bottom:0;width:6vw;z-index:4;padding-top:4vh;overflow:hidden;',
-    '  background:linear-gradient(90deg,rgba(0,0,0,.95),rgba(0,0,0,.55));transition:width .15s}',
+    '  background:linear-gradient(90deg,rgba(0,0,0,.95),rgba(0,0,0,.55))}',
     '#' + PREFIX + '-home.' + PREFIX + '-nav-open .' + PREFIX + '-nav{width:22vw;background:rgba(8,8,12,.97)}',
-    '.' + PREFIX + '-nav .' + PREFIX + '-logo{font-size:1.3vw;margin:0 0 3vh 1.3vw;white-space:nowrap;opacity:0;',
-    '  transition:opacity .15s}',
+    '.' + PREFIX + '-nav .' + PREFIX + '-logo{font-size:1.3vw;margin:0 0 3vh 1.3vw;white-space:nowrap;opacity:0}',
     '#' + PREFIX + '-home.' + PREFIX + '-nav-open .' + PREFIX + '-nav .' + PREFIX + '-logo{opacity:1}',
     '.' + PREFIX + '-nav-item{display:flex;align-items:center;height:5.6vh;padding:0 1.2vw;color:#999;',
     '  font-size:1.3vw;white-space:nowrap;border-radius:0 6px 6px 0}',
@@ -130,7 +128,7 @@
     '.' + PREFIX + '-nav-icon{flex:0 0 auto;width:2vw;height:2vw;margin:0 1.6vw 0 .6vw}',
     '.' + PREFIX + '-nav-icon svg{width:100%;height:100%;display:block}',
     '.' + PREFIX + '-card.' + PREFIX + '-brand .' + PREFIX + '-thumb{padding-top:70%;background-size:cover}',
-    '.' + PREFIX + '-nav-label{opacity:0;transition:opacity .15s}',
+    '.' + PREFIX + '-nav-label{opacity:0}',
     '#' + PREFIX + '-home.' + PREFIX + '-nav-open .' + PREFIX + '-nav-label{opacity:1}',
     '.' + PREFIX + '-has-nav .' + PREFIX + '-rail{padding-left:8vw}',
     '.' + PREFIX + '-has-nav .' + PREFIX + '-row-title{margin-left:8vw}',
@@ -532,6 +530,13 @@
       if (t && !best) best = t;
     }
     return best;
+  }
+
+  // As imagens do Streann vêm em 1920x1080 (~450 KB); com ?width= o servidor devolve um WebP
+  // pequeno. Decodificar as originais era o que travava a navegação no Fire TV.
+  function sized(url, w) {
+    if (!url || url.indexOf('?') !== -1 || !/^https:\/\/img\.streann\.tech\//.test(url)) return url;
+    return url + '?width=' + w;
   }
 
   function toItem(v) {
@@ -987,7 +992,7 @@
   function showHero(hero, item) {
     if (!hero || !item || !item.img || item === heroItem) return;
     heroItem = item;
-    hero.style.backgroundImage = 'url("' + (item.backdrop || item.img).replace(/"/g, '%22') + '")';
+    hero.style.backgroundImage = 'url("' + sized(item.backdrop || item.img, 1280).replace(/"/g, '%22') + '")';
     hero.querySelector('.' + PREFIX + '-hero-title').textContent = item.title;
     var meta = [];
     if (item.group) meta.push(item.group);
@@ -1023,7 +1028,7 @@
     card.setAttribute('tabindex', '-1');
     card.setAttribute(PREFIX + '-focusable', '');
     // as capas carregam conforme o foco chega perto (loadThumbs)
-    if (item.img) card.setAttribute(PREFIX + '-img', item.img);
+    if (item.img) card.setAttribute(PREFIX + '-img', sized(item.img, 400));
     card.appendChild(el('div', PREFIX + '-thumb'));
     if (item.progress) {
       var bar = el('div', PREFIX + '-progress');
@@ -1313,7 +1318,8 @@
       renderHero(scroll, cont[0] || first);
       if (cont.length) addRow(scroll, 'Continuar assistindo', cont);
       if (mine.length) addRow(scroll, 'Minha lista', mine);
-      catalog.forEach(function (r) { addRow(scroll, r.title, r.items); });
+      // fileiras mais curtas deixam a tela leve; o resto fica nos Canais e Categorias
+      catalog.forEach(function (r) { addRow(scroll, r.title, r.items.slice(0, 30)); });
       return;
     }
     if (page.key === 'channels') {
@@ -1500,11 +1506,17 @@
     if (!rail || !rail.classList.contains(PREFIX + '-rail')) return;
     var pad = window.innerWidth * (home.classList.contains(PREFIX + '-has-nav') ? 0.08 : 0.04);
     var x = rail.tvfX || 0;
-    var left = e.offsetLeft - x;
-    var right = left + e.offsetWidth;
     var width = rail.parentNode.clientWidth;
-    if (right > width - pad) x += right - (width - pad);
-    else if (left < pad) x = Math.max(0, e.offsetLeft - pad);
+    var r = Number(e.getAttribute(PREFIX + '-r'));
+    if (homeGrid[r] && !homeGrid[r].keepCol) {
+      // fileira desliza e o card focado fica sempre na primeira posição, como no YouTube e na Netflix
+      x = Math.max(0, e.offsetLeft - rail.firstChild.offsetLeft);
+    } else {
+      var left = e.offsetLeft - x;
+      var right = left + e.offsetWidth;
+      if (right > width - pad) x += right - (width - pad);
+      else if (left < pad) x = Math.max(0, e.offsetLeft - pad);
+    }
     if (x !== (rail.tvfX || 0)) {
       rail.tvfX = x;
       rail.style.transform = 'translate3d(' + (-x) + 'px,0,0)';
@@ -1736,7 +1748,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.8.0',
+    version: '0.8.1',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,
