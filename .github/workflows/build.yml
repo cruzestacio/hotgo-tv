@@ -39,16 +39,25 @@ jobs:
           name: hotgo-tv-firetv
           path: hotgo-tv-firetv.apk
 
+  # Publica a Release v<versão do package.json> a cada push na main (ou tag v*).
+  # O link fixo para o Downloader do Fire TV fica em
+  # https://github.com/cruzestacio/hotgo-tv/releases/latest/download/hotgo-tv-firetv.apk
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     needs: [overlay, firetv]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+      - id: version
+        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with:
           name: hotgo-tv-firetv
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
           files: hotgo-tv-firetv.apk
