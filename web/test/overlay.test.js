@@ -87,6 +87,47 @@ async function apiScenario(browser) {
   await page.close();
 }
 
+// Sem sessão no hotgo.tv, o app abre o login por código e grava a sessão quando o código é confirmado
+async function codeLoginScenario(browser) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const errors = [];
+  let polls = 0;
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.route('https://www.hotgo.tv/**', (r) => r.fulfill({
+    contentType: 'text/html', body: '<!doctype html><title>hotgo</title><body><streann-root></streann-root></body>'
+  }));
+  await page.route('https://api.streann.tech/**', (r) => {
+    const u = new URL(r.request().url());
+    if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: cors() });
+    if (u.pathname.endsWith('/login-code')) return r.fulfill({ headers: cors(), json: { id: 'x', code: '123456', date: Date.now() } });
+    if (u.pathname.includes('/smartTv/login/code/123456/')) {
+      assert.strictEqual(r.request().headers()['authorization'].length, 64);
+      polls++;
+      if (polls < 2) return r.fulfill({ headers: cors(), body: '' });
+      return r.fulfill({ headers: cors(), json: { access_token: 'tok-codigo', refresh_token: 'ref', expires_in: 3600 } });
+    }
+    return r.fulfill({ status: 404, headers: cors(), body: '{}' });
+  });
+  await page.route('https://cf.streann.tech/**', (r) => {
+    const u = new URL(r.request().url());
+    if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: cors() });
+    if (u.pathname === '/web/services/user') return r.fulfill({ headers: cors(), json: { id: 'user1', ipCountry: 'BR' } });
+    return r.fulfill({ status: 404, headers: cors(), body: '{}' });
+  });
+  await page.addInitScript(() => { window.hotgoTVPollEvery = 200; });
+  await page.goto('https://www.hotgo.tv/pt/home');
+  await page.addScriptTag({ content: OVERLAY });
+  await page.waitForSelector('#tvf-login.open', { timeout: 3000 });
+  await page.waitForFunction(() => document.getElementById('tvf-code').textContent === '123456', null, { timeout: 3000 });
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'login-code.png') });
+  await page.waitForFunction(() => localStorage.getItem('access_token') === 'tok-codigo', null, { timeout: 15000 });
+  await page.waitForFunction(() => localStorage.getItem('userId') === 'user1', null, { timeout: 3000 });
+  assert.strictEqual(await page.evaluate(() => localStorage.getItem('remeberMe')), 'true');
+  console.log('login por código ok, polls:', polls);
+  assert.deepStrictEqual(errors, []);
+  await page.close();
+}
+
 function cors() {
   return {
     'access-control-allow-origin': 'https://www.hotgo.tv',
@@ -152,6 +193,7 @@ function cors() {
 
   assert.deepStrictEqual(errors, []);
   await apiScenario(browser);
+  await codeLoginScenario(browser);
   await browser.close();
   console.log('ok: overlay passou em todos os cenários');
 })().catch((e) => { console.error(e); process.exit(1); });

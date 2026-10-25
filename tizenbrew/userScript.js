@@ -27,7 +27,12 @@
     base: 'https://cf.streann.tech',
     reseller: '6361cf81e4b00c6a81f8f316',
     publicToken: 'MwR78kBCrcvqeyaNTbjH13Z5LMDs45Hty',
-    appName: 'hotgo'
+    appName: 'hotgo',
+    // login por código (hotgo.tv/tv), o mesmo do app oficial de Android TV
+    tvBase: 'https://api.streann.tech/web/',
+    tvAuth: '836d9c49e641d736ab6c96e2bae922d8abf8a41477b535e04f4239b83d2fc3b1',
+    codeTtl: 5 * 60 * 1000,
+    pollEvery: window.hotgoTVPollEvery || 4000
   };
 
   var KEY = {
@@ -56,6 +61,10 @@
   var catalogLoading = false;
   var player = null;
   var pointerDirty = true;
+  var loginEl = null;
+  var loginOpen = false;
+  var loginTimer = 0;
+  var loginTick = 0;
   var homeGrid = [];
 
   // ---------------------------------------------------------------- estilos
@@ -95,6 +104,13 @@
     '  width:100vw !important;height:100vh !important;max-width:none !important;max-height:none !important;',
     '  z-index:2147483645 !important;background:#000 !important;object-fit:contain !important;transform:none !important}',
     '#' + PREFIX + '-player{display:none;background:#000}',
+    '#' + PREFIX + '-login{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2147483642;display:none;',
+    '  background:#0b0b0f;color:#fff;font-family:Roboto,Arial,sans-serif;text-align:center}',
+    '#' + PREFIX + '-login.open{display:flex;align-items:center;justify-content:center}',
+    '.' + PREFIX + '-login-step{font-size:1.6vw;color:#bbb;margin:1vh 0}',
+    '.' + PREFIX + '-login-url{font-size:3vw;font-weight:700;margin:1vh 0 3vh}',
+    '.' + PREFIX + '-login-code{font-size:7vw;font-weight:800;letter-spacing:.3em;margin:2vh 0}',
+    '.' + PREFIX + '-login-status{font-size:1.3vw;color:#999;margin:0 0 4vh}',
     '#' + PREFIX + '-osd{position:fixed;left:0;right:0;bottom:0;z-index:2147483646;padding:4vh 4vw;',
     '  background:linear-gradient(transparent,rgba(0,0,0,.9));color:#fff;font-family:Roboto,Arial,sans-serif;',
     '  font-size:1.4vw;opacity:0;transition:opacity .25s;pointer-events:none}',
@@ -165,7 +181,7 @@
   }
 
   function candidates() {
-    var root = homeOpen ? home : document;
+    var root = loginOpen ? loginEl : homeOpen ? home : document;
     if (!homeOpen && pointerDirty) {
       pointerDirty = false;
       markPointerElements(document.body);
@@ -175,6 +191,7 @@
     for (var i = 0; i < all.length; i++) {
       var e = all[i];
       if (!homeOpen && home && home.contains(e)) continue;
+      if (!loginOpen && loginEl && loginEl.contains(e)) continue;
       // um link que envolve outro clicável: fica só o de fora
       if (e.parentElement && closest(e.parentElement, 'a[href],button')) continue;
       if (isVisible(e)) out.push(e);
@@ -293,9 +310,9 @@
   }
 
   function move(dir) {
-    if (homeOpen && homeGrid.length) { homeMove(dir); return; }
+    if (!loginOpen && homeOpen && homeGrid.length) { homeMove(dir); return; }
     if (!current || !document.contains(current) || !isVisible(current) ||
-        (homeOpen && !home.contains(current))) {
+        (loginOpen && !loginEl.contains(current)) || (!loginOpen && homeOpen && !home.contains(current))) {
       firstFocus();
       return;
     }
@@ -310,7 +327,7 @@
     }
     if (best) {
       setFocus(best);
-    } else if (!homeOpen) {
+    } else if (!homeOpen && !loginOpen) {
       // nada na direção: rola a página para revelar mais conteúdo
       var dy = dir === 'down' ? 0.6 : dir === 'up' ? -0.6 : 0;
       if (dy) window.scrollBy(0, window.innerHeight * dy);
@@ -337,8 +354,12 @@
   }
 
   function accessToken() {
-    var t = store('access_token');
+    var t = store('remeberMe') === 'true' || !sessionToken() ? store('access_token') : sessionToken();
     return t && t !== 'null' && t !== 'undefined' ? t : null;
+  }
+
+  function sessionToken() {
+    try { return window.sessionStorage.getItem('access_token'); } catch (err) { return null; }
   }
 
   function lang() {
@@ -463,6 +484,129 @@
     });
   }
 
+
+  // ------------------------------------------- login por código (hotgo.tv/tv)
+
+  function setText(id, text) {
+    var e = document.getElementById(PREFIX + '-' + id);
+    if (e) e.textContent = text;
+  }
+
+  function buildLogin() {
+    loginEl = el('div');
+    loginEl.id = PREFIX + '-login';
+    var box = el('div', PREFIX + '-login-box');
+    box.appendChild(el('div', PREFIX + '-logo', 'HOTGO'));
+    box.appendChild(el('p', PREFIX + '-login-step', 'No celular, acesse'));
+    box.appendChild(el('p', PREFIX + '-login-url', 'hotgo.tv/tv'));
+    box.appendChild(el('p', PREFIX + '-login-step', 'entre na sua conta e digite o código:'));
+    var code = el('div', PREFIX + '-login-code', '······');
+    code.id = PREFIX + '-code';
+    box.appendChild(code);
+    var status = el('p', PREFIX + '-login-status', '');
+    status.id = PREFIX + '-code-status';
+    box.appendChild(status);
+    var again = el('button', PREFIX + '-btn', 'Novo código');
+    again.onclick = function () { startCode(); };
+    var email = el('button', PREFIX + '-btn', 'Entrar com e-mail e senha');
+    email.onclick = function () {
+      try { window.sessionStorage.setItem('tvfEmailLogin', '1'); } catch (err) { /* sem storage */ }
+      closeCodeLogin();
+      window.location.href = window.location.origin + '/' + lang() + '/login';
+    };
+    box.appendChild(again);
+    box.appendChild(email);
+    loginEl.appendChild(box);
+    document.body.appendChild(loginEl);
+  }
+
+  function openCodeLogin() {
+    if (!onHotgo()) return;
+    if (!loginEl) buildLogin();
+    closeHome();
+    loginOpen = true;
+    loginEl.classList.add('open');
+    setFocus(loginEl.querySelector('.' + PREFIX + '-btn'));
+    startCode();
+  }
+
+  function closeCodeLogin() {
+    loginOpen = false;
+    clearTimeout(loginTimer);
+    clearInterval(loginTick);
+    if (loginEl) loginEl.classList.remove('open');
+    if (current && loginEl && loginEl.contains(current)) current = null;
+  }
+
+  function startCode() {
+    clearTimeout(loginTimer);
+    clearInterval(loginTick);
+    setText('code', '······');
+    setText('code-status', 'Gerando código…');
+    fetch(API.tvBase + 'services/public/login-code?resellerId=' + API.reseller).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }).then(function (c) {
+      if (!loginOpen || !c || !c.code) return;
+      setText('code', c.code);
+      var expires = Date.now() + API.codeTtl;
+      var tick = function () {
+        var left = Math.max(0, Math.round((expires - Date.now()) / 1000));
+        setText('code-status', 'Este código expira em ' + Math.floor(left / 60) + ':' + (left % 60 < 10 ? '0' : '') + (left % 60));
+        if (!left) startCode();
+      };
+      tick();
+      loginTick = setInterval(tick, 1000);
+      pollCode(c.code);
+    }).catch(function (err) {
+      setText('code-status', 'Não deu para gerar o código (' + err.message + '). Aperte "Novo código".');
+    });
+  }
+
+  // Enquanto ninguém confirmou, o servidor responde 200 sem corpo
+  function pollCode(code) {
+    loginTimer = setTimeout(function () {
+      if (!loginOpen) return;
+      fetch(API.tvBase + 'services/public/smartTv/login/code/' + code + '/reseller/' + API.reseller, {
+        headers: { 'Authorization': API.tvAuth }
+      }).then(function (res) { return res.ok ? res.text() : ''; }).then(function (text) {
+        var token = null;
+        try { token = text ? JSON.parse(text) : null; } catch (err) { token = null; }
+        if (token && token.access_token) saveSession(token);
+        else pollCode(code);
+      }, function () { pollCode(code); });
+    }, API.pollEvery);
+  }
+
+  // Grava a sessão como o site faz (authService.setSession) e recarrega já logado
+  function saveSession(token) {
+    clearInterval(loginTick);
+    setText('code-status', 'Conectado! Carregando…');
+    var expiresIn = token.expires_in || 3600;
+    try {
+      var ls = window.localStorage;
+      ls.setItem('remeberMe', 'true');
+      ls.setItem('termsCheck', 'true');
+      ls.setItem('loggedInWithUser', 'true');
+      ls.setItem('access_token', token.access_token);
+      if (token.refresh_token) ls.setItem('refresh_token', token.refresh_token);
+      ls.setItem('expires_in', String(expiresIn));
+      ls.setItem('exp', String(Date.now() + expiresIn * 1000));
+      if (token.accountProfileId) ls.setItem('accountProfileId', token.accountProfileId);
+    } catch (err) { /* sem storage */ }
+    var go = function () {
+      closeCodeLogin();
+      window.location.href = window.location.origin + '/' + lang() + '/home';
+    };
+    api('GET', '/web/services/user', {}).then(function (user) {
+      try {
+        if (user && user.id) window.localStorage.setItem('userId', user.id);
+        if (user && user.ipCountry) window.localStorage.setItem('countryCode', user.ipCountry);
+      } catch (err) { /* sem storage */ }
+      go();
+    }, go);
+  }
+
   function sitePlayer(item) {
     window.location.href = window.location.origin + '/' + lang() + '/player/' + item.type + '/' + item.id;
   }
@@ -474,10 +618,7 @@
 
   function openItem(item) {
     closeHome();
-    if (!accessToken()) {
-      window.location.href = window.location.origin + '/' + lang() + '/login';
-      return;
-    }
+    if (!accessToken()) { openCodeLogin(); return; }
     if (!canPlayHls()) { sitePlayer(item); return; }
     var dataType = item.type === 'vod' ? 'videoondemand' : item.type;
     api('POST', '/web/services/user-v2/check-access', { isFromTabLayout: true }, {
@@ -722,6 +863,7 @@
   }
 
   function toggleHome() {
+    if (loginOpen) closeCodeLogin();
     if (homeOpen) { closeHome(); firstFocus(); return; }
     buildHome();
     openHome();
@@ -832,6 +974,7 @@
 
   // Retorna true quando o "voltar" foi tratado aqui; o app nativo decide o resto.
   function back() {
+    if (loginOpen) { closeCodeLogin(); firstFocus(); return true; }
     if (maxVideo) {
       var v = maxVideo;
       restore();
@@ -897,7 +1040,7 @@
     clearTimeout(autoTimer);
     autoTimer = setTimeout(function () {
       var path = window.location.pathname;
-      if (homeOpen || maxVideo || homeShownFor[path]) return;
+      if (homeOpen || loginOpen || maxVideo || homeShownFor[path]) return;
       if (/login|entrar|signin|cadastro|checkout|assin|player|select-profile/i.test(path)) return;
       // com o catálogo da API, o Início só abre sozinho na página inicial do site
       if (catalog && !/^\/([a-z]{2}\/?)?(home|main|browse)?\/?$/.test(path)) return;
@@ -918,13 +1061,18 @@
       }
     }).observe(document.body, { childList: true, subtree: true });
     loadCatalog(function () { maybeAutoHome(); });
+    // sem sessão, o app começa pelo login por código (a não ser que a pessoa tenha pedido e-mail e senha)
+    var emailLogin = false;
+    try { emailLogin = window.sessionStorage.getItem('tvfEmailLogin') === '1'; } catch (err) { emailLogin = false; }
+    if (onHotgo() && !accessToken() && !emailLogin) setTimeout(openCodeLogin, 300);
     maybeAutoHome();
     setTimeout(function () { if (!current) firstFocus(); }, 800);
   }
 
   window.hotgoTV = {
-    version: '0.3.0',
+    version: '0.4.0',
     openItem: openItem,
+    codeLogin: openCodeLogin,
     reloadCatalog: loadCatalog,
     toggleHome: toggleHome,
     back: back,
