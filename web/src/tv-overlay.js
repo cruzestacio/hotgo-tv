@@ -73,7 +73,7 @@
     '  border-radius:6px;position:relative;z-index:1}',
     'html.' + PREFIX + '-tv ::-webkit-scrollbar{display:none}',
     '#' + PREFIX + '-home{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2147483640;',
-    '  background:#141414;color:#fff;overflow:hidden;font-family:Roboto,"Helvetica Neue",Arial,sans-serif;display:none}',
+    '  background:#0f0f0f;color:#fff;overflow:hidden;font-family:Roboto,"Helvetica Neue",Arial,sans-serif;display:none}',
     '#' + PREFIX + '-home.open{display:block}',
     '@keyframes ' + PREFIX + '-in{from{opacity:0}to{opacity:1}}',
     // a rolagem é por transform (camada da GPU): scrollTop/scrollLeft repintavam a tela toda no Fire TV
@@ -108,14 +108,14 @@
     '.' + PREFIX + '-card{position:relative;flex:0 0 auto;width:26vw;margin-right:1.6vw;border-radius:1vw;',
     '  white-space:normal}',
     '.' + PREFIX + '-card.' + PREFIX + '-focus{outline:none !important;z-index:2}',
-    '.' + PREFIX + '-thumb{position:relative;width:100%;padding-top:56.25%;border-radius:1vw;overflow:hidden;',
-    '  background:#272727 center/cover no-repeat;transition:transform .15s ease-out}',
+    '.' + PREFIX + '-thumb{position:relative;width:100%;padding-top:56.25%;border-radius:.85vw;overflow:hidden;',
+    '  background:#272727 center/cover no-repeat}',
     // foco: anel branco na miniatura (como no YouTube) e título em destaque
-    '.' + PREFIX + '-card.' + PREFIX + '-focus .' + PREFIX + '-thumb{box-shadow:0 0 0 .3vw #fff;transform:scale(1.03)}',
-    '.' + PREFIX + '-card-title{font-size:1.25vw;line-height:1.3;font-weight:500;color:#aaa;margin:1.2vh .2vw 0;',
-    '  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;max-height:3.3vw}',
+    '.' + PREFIX + '-card.' + PREFIX + '-focus .' + PREFIX + '-thumb{box-shadow:0 0 0 .42vw #fff}',
+    '.' + PREFIX + '-card-title{font-size:1.45vw;line-height:1.3;font-weight:700;color:#aaa;margin:1.4vh .2vw 0;',
+    '  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;max-height:3.8vw}',
     '.' + PREFIX + '-card.' + PREFIX + '-focus .' + PREFIX + '-card-title{color:#fff;font-weight:700}',
-    '.' + PREFIX + '-card-meta{font-size:1vw;color:#888;margin:.5vh .2vw 0;white-space:nowrap;overflow:hidden;',
+    '.' + PREFIX + '-card-meta{font-size:1.15vw;color:#aaa;margin:.5vh .2vw 0;white-space:nowrap;overflow:hidden;',
     '  text-overflow:ellipsis}',
     '.' + PREFIX + '-badge{position:absolute;right:.6vw;bottom:.6vw;background:rgba(0,0,0,.8);color:#fff;',
     '  font-size:.95vw;font-weight:600;padding:.2vh .5vw;border-radius:.4vw}',
@@ -128,7 +128,8 @@
     '.' + PREFIX + '-nav-item{display:flex;align-items:center;height:5.6vh;padding:0 1.2vw;color:#999;',
     '  font-size:1.3vw;white-space:nowrap;border-radius:0 6px 6px 0}',
     '.' + PREFIX + '-nav-item.active{color:#fff;font-weight:700;box-shadow:inset .3vw 0 0 #e50914}',
-    '.' + PREFIX + '-nav-item.' + PREFIX + '-focus{outline:none !important;background:#fff;color:#000}',
+    '.' + PREFIX + '-nav-item.' + PREFIX + '-focus{outline:none !important;background:#fff;color:#000;border-radius:.7vw;',
+    '  margin:0 .6vw}',
     '.' + PREFIX + '-nav-icon{flex:0 0 auto;width:2vw;height:2vw;margin:0 1.6vw 0 .6vw}',
     '.' + PREFIX + '-nav-icon svg{width:100%;height:100%;display:block}',
     '.' + PREFIX + '-card.' + PREFIX + '-brand .' + PREFIX + '-thumb{padding-top:70%;background-size:cover}',
@@ -139,7 +140,15 @@
     '.' + PREFIX + '-has-nav .' + PREFIX + '-rail{padding-left:8vw}',
     '.' + PREFIX + '-has-nav .' + PREFIX + '-row-title{margin-left:8vw}',
     '.' + PREFIX + '-has-nav .' + PREFIX + '-hero-info{left:8vw}',
-    '.' + PREFIX + '-has-nav .' + PREFIX + '-card{width:25vw}',
+    '.' + PREFIX + '-has-nav .' + PREFIX + '-card{width:27.5vw;margin-right:1.9vw}',
+    '.' + PREFIX + '-has-nav .' + PREFIX + '-row-focus .' + PREFIX + '-card{width:37.5vw}',
+    '.' + PREFIX + '-has-nav .' + PREFIX + '-row-title{color:#aaa;font-size:1.6vw}',
+    '.' + PREFIX + '-has-nav .' + PREFIX + '-row-focus .' + PREFIX + '-row-title{color:#fff}',
+    '.' + PREFIX + '-topbar{display:flex;align-items:center;justify-content:space-between;padding:5vh 5vw 3vh 8vw}',
+    '.' + PREFIX + '-search-pill{width:37.5vw;height:6.7vh;line-height:6.7vh;border-radius:3.4vh;background:#272727;',
+    '  color:#aaa;font-size:1.6vw;padding:0 2vw;box-sizing:border-box}',
+    '.' + PREFIX + '-search-pill.' + PREFIX + '-focus{outline:none !important;background:#fff;color:#000}',
+    '.' + PREFIX + '-topbar .' + PREFIX + '-logo{margin:0;font-size:2vw}',
     '.' + PREFIX + '-has-nav .' + PREFIX + '-row.' + PREFIX + '-grid .' + PREFIX + '-card{width:19.5vw}',
     '.' + PREFIX + '-page-title{font-size:2.6vw;font-weight:800;margin:7vh 0 3vh 8vw}',
     '.' + PREFIX + '-message{margin:0 0 0 8vw;color:#aaa;font-size:1.4vw}',
@@ -323,6 +332,7 @@
       var inNav = e.getAttribute(PREFIX + '-n') !== null;
       home.classList.toggle(PREFIX + '-nav-open', inNav);
       if (!inNav) {
+        focusRow(e);
         scrollHome(e);
         heroFollow(e);
         if (e.getAttribute(PREFIX + '-r') !== null) {
@@ -332,6 +342,24 @@
       }
     }
     else scrollIntoView(e);
+  }
+
+  // Como no YouTube: a fileira focada fica com cards maiores e título branco; a que perde o foco
+  // encolhe e reposiciona a faixa para continuar mostrando o card em que a pessoa estava
+  var focusedRow = null;
+  function focusRow(e) {
+    var row = closest(e, '.' + PREFIX + '-row');
+    if (row === focusedRow) return;
+    var prev = focusedRow;
+    focusedRow = row;
+    if (prev) prev.classList.remove(PREFIX + '-row-focus');
+    if (row) row.classList.add(PREFIX + '-row-focus');
+    var rail = prev && prev.querySelector('.' + PREFIX + '-rail');
+    if (rail && rail.tvfCard && rail.firstChild) {
+      var x = Math.max(0, rail.tvfCard.offsetLeft - rail.firstChild.offsetLeft);
+      rail.tvfX = x;
+      rail.style.transform = 'translate3d(' + (-x) + 'px,0,0)';
+    }
   }
 
   function scrollIntoView(e) {
@@ -1044,7 +1072,7 @@
     card.setAttribute('tabindex', '-1');
     card.setAttribute(PREFIX + '-focusable', '');
     // as capas carregam conforme o foco chega perto (loadThumbs)
-    if (item.img) card.setAttribute(PREFIX + '-img', sized(item.img, 480));
+    if (item.img) card.setAttribute(PREFIX + '-img', sized(item.img, 720));
     var thumb = el('div', PREFIX + '-thumb');
     card.appendChild(thumb);
     // canal sem logo: o nome no lugar da imagem
@@ -1179,6 +1207,7 @@
   function contentTarget() {
     var r = page.r, c = page.c;
     if (typeof r === 'number' && homeGrid[r]) return homeGrid[r][Math.min(c || 0, homeGrid[r].length - 1)];
+    if (page.key === 'home' && hasNav() && homeGrid[1]) return homeGrid[1][0];
     return home.querySelector('.' + PREFIX + '-hero .' + PREFIX + '-btn') || (homeGrid[0] && homeGrid[0][0]) || null;
   }
 
@@ -1282,11 +1311,12 @@
     });
   }
 
-  var KEYBOARD = ['abcdef', 'ghijkl', 'mnopqr', 'stuvwx', 'yz1234', '567890'];
+  var KEYBOARD = ['abcdefg', 'hijklmn', 'opqrstu', 'vwxyz12', '3456789', '0'];
 
   function typeKey(ch) {
     var p = page;
     if (ch === 'del') p.query = p.query.slice(0, -1);
+    else if (ch === 'clear') p.query = '';
     else p.query += ch;
     var box = document.getElementById(PREFIX + '-search-box');
     if (box) box.textContent = p.query || 'Digite para buscar';
@@ -1315,7 +1345,10 @@
   }
 
   function renderResults(scroll, p) {
-    if (p.results.length) addGrid(scroll, p.results, null, PREFIX + '-results');
+    if (p.results.length) {
+      scroll.appendChild(el('h2', PREFIX + '-row-title ' + PREFIX + '-results', 'Resultados da pesquisa para "' + p.searched + '"'));
+      addGrid(scroll, p.results, null, PREFIX + '-results');
+    }
     else if (p.searched) message(scroll, 'Nada encontrado para "' + p.searched + '"', PREFIX + '-results');
   }
 
@@ -1333,11 +1366,20 @@
 
   function renderPage(scroll) {
     if (page.key === 'home') {
-      var first = catalog[0] && catalog[0].items[0];
       catalog.forEach(function (r) { r.items.forEach(function (it) { it.group = r.title; }); });
       var cont = continueItems();
       var mine = loadJson(LIST_KEY);
-      renderHero(scroll, cont[0] || first);
+      // topo como no YouTube: busca em pílula à esquerda e a marca à direita, sem destaque gigante
+      var top = el('div', PREFIX + '-topbar');
+      var pill = el('div', PREFIX + '-search-pill', 'Pesquisar');
+      pill.setAttribute('tabindex', '-1');
+      pill.setAttribute(PREFIX + '-focusable', '');
+      pill.onclick = function () { goPage('search'); };
+      top.appendChild(pill);
+      top.appendChild(el('span', PREFIX + '-logo', 'HOTGO'));
+      scroll.appendChild(top);
+      homeGrid.push([pill]);
+      homeGrid[homeGrid.length - 1].keepCol = true;
       if (cont.length) addRow(scroll, 'Continuar assistindo', cont);
       if (mine.length) addRow(scroll, 'Minha lista', mine);
       // fileiras mais curtas deixam a tela leve; o resto fica nos Canais e Categorias
@@ -1376,7 +1418,8 @@
       });
       addRow(scroll, null, [
         { title: 'Espaço', cls: 'wide', open: function () { typeKey(' '); } },
-        { title: 'Apagar', cls: 'wide', open: function () { typeKey('del'); } }
+        { title: 'Apagar', cls: 'wide', open: function () { typeKey('del'); } },
+        { title: 'Limpar', cls: 'wide', open: function () { typeKey('clear'); } }
       ], 'key');
       page.kbRows = homeGrid.length;
       renderResults(scroll, page);
@@ -1518,7 +1561,9 @@
     var bar = home.querySelector('.' + PREFIX + '-bar');
     if (!scroll) return;
     var row = closest(e, '.' + PREFIX + '-row');
-    var y = row ? Math.max(0, row.offsetTop - window.innerHeight * 0.3) : 0;
+    // a fileira focada encaixa sempre na mesma altura; a próxima só espia embaixo
+    var top = home.classList.contains(PREFIX + '-has-nav') ? 0.12 : 0.3;
+    var y = row ? Math.max(0, row.offsetTop - window.innerHeight * top) : 0;
     if (scroll.tvfY !== y) {
       scroll.tvfY = y;
       scroll.style.transform = 'translate3d(0,' + (-y) + 'px,0)';
@@ -1526,6 +1571,7 @@
     }
     var rail = e.parentNode;
     if (!rail || !rail.classList.contains(PREFIX + '-rail')) return;
+    rail.tvfCard = e;
     var pad = window.innerWidth * (home.classList.contains(PREFIX + '-has-nav') ? 0.08 : 0.04);
     var x = rail.tvfX || 0;
     var width = rail.parentNode.clientWidth;
@@ -1648,6 +1694,8 @@
       // como na Netflix: Voltar sobe para a tela anterior e, no Início, pede para sair
       if (page.parent) { goPage(page.parent); return true; }
       if (page.key !== 'home') { goPage('home'); return true; }
+      // no Início, Voltar abre o menu (YouTube); com o menu aberto, Voltar pede para sair
+      if (current && current.getAttribute(PREFIX + '-n') === null && navItems.length) { focusNav(); return true; }
       return exitApp();
     }
     if (homeOpen) { closeHome(); firstFocus(); return true; }
@@ -1759,7 +1807,7 @@
     if (appMode()) { buildHome(); openHome(); }
     loadCatalog(function () {
       // o Início do modo app já estava aberto com "Carregando…": refaz com o catálogo
-      if (appMode() && homeOpen) { buildHome(); openHome(); } else maybeAutoHome();
+      if (appMode() && homeOpen) { page = { key: 'home' }; buildHome(); openHome(); } else maybeAutoHome();
     });
     // sem sessão, o app começa pelo login por código (a não ser que a pessoa tenha pedido e-mail e senha)
     var emailLogin = false;
@@ -1770,7 +1818,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.9.0',
+    version: '0.10.0',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,

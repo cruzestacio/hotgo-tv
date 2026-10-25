@@ -4,15 +4,25 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.KeyEvent
+import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.FrameLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.DefaultTimeBar
 import androidx.media3.ui.PlayerView
 
 /**
@@ -23,6 +33,7 @@ import androidx.media3.ui.PlayerView
 class PlayerActivity : Activity() {
 
     private lateinit var view: PlayerView
+    private lateinit var titleView: TextView
     private var player: ExoPlayer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,7 +47,37 @@ class PlayerActivity : Activity() {
             setShowNextButton(false)
             setShowPreviousButton(false)
         }
-        setContentView(view)
+        // como no YouTube: barra de progresso vermelha com bolinha branca
+        view.findViewById<DefaultTimeBar>(androidx.media3.ui.R.id.exo_progress)?.apply {
+            setPlayedColor(Color.rgb(255, 0, 0))
+            setScrubberColor(Color.WHITE)
+            setBufferedColor(Color.argb(140, 255, 255, 255))
+            setUnplayedColor(Color.argb(70, 255, 255, 255))
+        }
+        // título no canto superior esquerdo, aparecendo junto com os controles
+        titleView = TextView(this).apply {
+            text = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, resources.displayMetrics.heightPixels * 0.037f)
+            typeface = Typeface.DEFAULT_BOLD
+            maxLines = 2
+            val padH = (resources.displayMetrics.widthPixels * 0.05f).toInt()
+            val padV = (resources.displayMetrics.heightPixels * 0.06f).toInt()
+            setPadding(padH, padV, padH, padV * 2)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.argb(200, 0, 0, 0), Color.TRANSPARENT)
+            )
+        }
+        view.setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
+            titleView.visibility = visibility
+        })
+        val root = FrameLayout(this)
+        root.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        root.addView(titleView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
+        titleView.visibility = View.GONE
+        setContentView(root)
     }
 
     override fun onStart() {
@@ -113,7 +154,7 @@ class PlayerActivity : Activity() {
         private const val EXTRA_POSITION = "position"
         private const val SEEK_MS = 10_000L
         private const val FAST_MS = 30_000L
-        private const val CONTROLLER_TIMEOUT_MS = 3_000
+        private const val CONTROLLER_TIMEOUT_MS = 5_000
 
         /** Posição e duração (ms) de quando o player fechou; MainActivity consome no onResume. */
         @Volatile

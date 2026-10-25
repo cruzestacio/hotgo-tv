@@ -91,7 +91,9 @@ async function apiScenario(browser) {
   assert.ok(calls.some((c) => c.path === '/web/services/v3/external/tab-layout'));
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'home-api.png') });
 
-  await press(page, 'ArrowDown');
+  // como no YouTube: busca em pílula no topo e o foco começa no primeiro card da primeira fileira
+  assert.strictEqual(await page.$eval('.tvf-search-pill', (p) => p.textContent), 'Pesquisar');
+  assert.strictEqual(await page.$eval('.tvf-row-focus .tvf-row-title', (h) => h.textContent), 'Estreias');
   const first = await focused(page);
   // o card focado tem que se destacar dos outros
   const look = await page.evaluate(() => {
@@ -134,15 +136,20 @@ async function apiScenario(browser) {
 
   // modo app (logado): sem botão do site, o destaque segue o foco, e Voltar no Início não mostra o site
   assert.ok(!(await page.$$eval('.tvf-bar .tvf-btn', (b) => b.map((x) => x.textContent))).includes('Site completo'));
+  // a fileira focada tem cards maiores que as outras
   await press(page, 'ArrowDown');
   await press(page, 'ArrowRight');
-  await page.waitForTimeout(500);
-  const heroTitle = await page.$eval('.tvf-hero-title', (h) => h.textContent);
-  assert.strictEqual(heroTitle, await focused(page));
+  assert.strictEqual(await page.$eval('.tvf-row-focus .tvf-row-title', (h) => h.textContent), 'Mais vistos');
+  const widths = await page.evaluate(() => [document.querySelector('.tvf-row-focus .tvf-card').offsetWidth,
+    document.querySelector('.tvf-row:not(.tvf-row-focus) .tvf-card').offsetWidth]);
+  assert.ok(widths[0] > widths[1] * 1.2, 'fileira focada não cresceu: ' + widths);
   await page.evaluate(() => {
     window.exited = 0;
     window.HotGoNative = { exit: () => { window.exited++; } };
   });
+  // Voltar no Início abre o menu; com o menu aberto, pede para sair
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 10009, bubbles: true })));
+  assert.strictEqual(await page.$eval('#tvf-home', (h) => h.classList.contains('tvf-nav-open')), true);
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 10009, bubbles: true })));
   await page.waitForTimeout(100);
   assert.strictEqual(await page.$eval('#tvf-home', (h) => h.classList.contains('open')), true);
@@ -179,7 +186,7 @@ async function apiScenario(browser) {
   assert.strictEqual(await page.$eval('.tvf-page-title', (h) => h.textContent), 'Canais');
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 10009, bubbles: true })));
   await page.waitForTimeout(100);
-  assert.strictEqual(await page.$$eval('.tvf-hero', (h) => h.length), 1);
+  assert.strictEqual(await page.$$eval('.tvf-topbar', (h) => h.length), 1);
   const homeRows = await page.$$eval('.tvf-row-title', (h) => h.map((x) => x.textContent));
   assert.deepStrictEqual(homeRows.slice(0, 2), ['Minha lista', 'Estreias']);
   // o player avisa onde parou: o vídeo entra em "Continuar assistindo" com a barra de progresso
