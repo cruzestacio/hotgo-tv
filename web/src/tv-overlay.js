@@ -195,6 +195,11 @@
     '.' + PREFIX + '-dbtn{background:rgba(255,255,255,.14);color:#fff;font-size:1.35vw;font-weight:700;',
     '  padding:1.6vh 2vw;border-radius:.6vw;margin-right:1vw;white-space:nowrap}',
     '.' + PREFIX + '-dbtn.' + PREFIX + '-focus{background:#fff !important;color:#000;outline:none !important}',
+    '.' + PREFIX + '-row.' + PREFIX + '-account{margin:0 0 0 8vw;width:50vw}',
+    '.' + PREFIX + '-account-line{display:flex;font-size:1.45vw;padding:1.6vh 0;border-bottom:1px solid #272727}',
+    '.' + PREFIX + '-account-key{width:16vw;color:#aaa}',
+    '.' + PREFIX + '-account-val{color:#fff;font-weight:600}',
+    '.' + PREFIX + '-account .' + PREFIX + '-detail-buttons{margin-top:4vh}',
     '.' + PREFIX + '-detail-desc{font-size:1.3vw;line-height:1.45;color:#ddd;margin:0;display:-webkit-box;',
     '  -webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}',
     '.' + PREFIX + '-hint{position:fixed;right:2vw;bottom:2vh;font-size:.9vw;color:#aaa;z-index:3;',
@@ -1194,6 +1199,92 @@
     else window.location.href = card.href;
   }
 
+  // ------------------------------------------------- Conta e configurações
+
+  var account = null;
+  function loadAccount() {
+    if (account && account.loading) return;
+    account = { loading: true };
+    var done = function () { if (homeOpen && page.key === 'account') refresh(); };
+    api('GET', '/web/services/user', {}).then(function (user) {
+      account.user = user || {};
+      return api('GET', '/web/services/user/has-active-subscription-web', {}).then(function (sub) {
+        account.sub = sub;
+      }, function () { account.sub = undefined; });
+    }).then(function () { account.loading = false; done(); }, function (err) {
+      account.loading = false;
+      account.error = err.message;
+      done();
+    });
+  }
+
+  function subscriptionText(sub) {
+    if (sub === true || (sub && (sub.hasActiveSubscription || sub.active || sub.hasActiveServices))) return 'Ativa';
+    if (sub === false || (sub && sub.hasActiveSubscription === false)) return 'Sem assinatura ativa';
+    return '—';
+  }
+
+  function logout() {
+    stopActivePlayer(0);
+    var keys = ['access_token', 'refresh_token', 'exp', 'expires_in', 'remeberMe', 'loggedInWithUser',
+                'userId', 'accountProfileId', 'hasAccess', 'player'];
+    keys.forEach(function (k) {
+      try { window.localStorage.removeItem(k); } catch (err) { /* sem storage */ }
+      try { window.sessionStorage.removeItem(k); } catch (err) { /* sem storage */ }
+    });
+    account = null;
+    page = { key: 'home' };
+    toast('Você saiu da conta');
+    openCodeLogin();
+  }
+
+  function renderAccount(scroll) {
+    scroll.appendChild(el('h1', PREFIX + '-page-title', 'Conta'));
+    if (!account) loadAccount();
+    var box = el('section', PREFIX + '-row ' + PREFIX + '-account');
+    var u = (account && account.user) || {};
+    var name = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.name || u.username || '';
+    var lines = [];
+    if (account && account.loading) lines.push(['Conta', 'Carregando…']);
+    else if (account && account.error) lines.push(['Conta', 'Não consegui carregar os dados']);
+    else {
+      if (name) lines.push(['Nome', name]);
+      if (u.email || u.username) lines.push(['E-mail', u.email || u.username]);
+      lines.push(['Assinatura', subscriptionText(account && account.sub)]);
+    }
+    lines.push(['Aparelho', 'Fire TV · ' + deviceId().slice(0, 10)]);
+    lines.push(['Versão do app', window.hotgoTV ? window.hotgoTV.version : '']);
+    lines.forEach(function (l) {
+      var line = el('div', PREFIX + '-account-line');
+      line.appendChild(el('span', PREFIX + '-account-key', l[0]));
+      line.appendChild(el('span', PREFIX + '-account-val', l[1]));
+      box.appendChild(line);
+    });
+    var buttons = el('div', PREFIX + '-detail-buttons');
+    var row = [];
+    var out = detailButton('Sair da conta', 'primary', function () {
+      // dois toques para não sair sem querer
+      if (out.tvfArmed) { logout(); return; }
+      out.tvfArmed = true;
+      out.textContent = 'Aperte OK de novo para sair';
+      setTimeout(function () { out.tvfArmed = false; out.textContent = 'Sair da conta'; }, 4000);
+    });
+    row.push(out);
+    row.push(detailButton('Atualizar catálogo', '', function () {
+      toast('Atualizando o catálogo…');
+      loadCatalog(function (c) { toast(c ? 'Catálogo atualizado' : 'Não consegui atualizar o catálogo'); });
+    }));
+    row.push(detailButton('Limpar histórico', '', function () {
+      saveJson(HISTORY_KEY, []);
+      toast('Histórico e "Continuar assistindo" limpos');
+    }));
+    row.forEach(function (b) { buttons.appendChild(b); });
+    box.appendChild(buttons);
+    scroll.appendChild(box);
+    homeGrid.push(row);
+    homeGrid[homeGrid.length - 1].keepCol = true;
+  }
+
   // ------------------------------------------------- tela do vídeo (detalhes)
 
   function relatedTo(item) {
@@ -1426,7 +1517,8 @@
     home: '<path d="M3 11.5L12 4l9 7.5V20h-6v-5H9v5H3z"/>',
     channels: '<rect x="3" y="7" width="18" height="12" rx="2"/><path d="M8 3l4 4 4-4"/>',
     categories: '<path d="M4 6h16M4 12h16M4 18h16"/>',
-    list: '<path d="M12 5v14M5 12h14"/>'
+    list: '<path d="M12 5v14M5 12h14"/>',
+    account: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'
   };
 
   function buildNav() {
@@ -1453,6 +1545,7 @@
     if (menu.length) add('channels', 'Canais');
     add('categories', 'Categorias');
     add('list', 'Minha lista');
+    add('account', 'Conta');
     home.appendChild(nav);
   }
 
@@ -1487,6 +1580,7 @@
     else if (key === 'categories') page = { key: 'categories' };
     else if (key === 'list') page = { key: 'list' };
     else if (key === 'channels') page = { key: 'channels' };
+    else if (key === 'account') page = { key: 'account' };
     else if (key.indexOf('ch:') === 0) {
       var id = key.slice(3);
       var ch = null;
@@ -1744,6 +1838,7 @@
       return;
     }
     if (page.key === 'detail') { renderDetail(scroll); return; }
+    if (page.key === 'account') { renderAccount(scroll); return; }
     if (page.key === 'channels') {
       scroll.appendChild(el('h1', PREFIX + '-page-title', 'Canais'));
       addGrid(scroll, menu.map(function (ch) {
@@ -1923,7 +2018,8 @@
     var top = home.classList.contains(PREFIX + '-has-nav') ? 0.12 : 0.3;
     var y = row ? Math.max(0, row.offsetTop - window.innerHeight * top) : 0;
     // na busca o teclado fica parado na tela; só os resultados fazem a tela subir
-    if (row && (row.classList.contains(PREFIX + '-kb-row') || row.classList.contains(PREFIX + '-detail'))) y = 0;
+    if (row && (row.classList.contains(PREFIX + '-kb-row') || row.classList.contains(PREFIX + '-detail') ||
+      row.classList.contains(PREFIX + '-account'))) y = 0;
     if (scroll.tvfY !== y) {
       scroll.tvfY = y;
       scroll.style.transform = 'translate3d(0,' + (-y) + 'px,0)';
@@ -2201,7 +2297,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.12.1',
+    version: '0.13.0',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,

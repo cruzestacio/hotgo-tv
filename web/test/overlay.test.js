@@ -64,6 +64,9 @@ async function apiScenario(browser) {
       return r.fulfill({ headers: cors(), json: [{ id: 's1', type: 'vod', name: 'Achado ' + new URLSearchParams(req.postData()).get('query'), image: 'https://img.example/s.jpg' }] });
     }
     if (u.pathname.endsWith('/check-access')) return r.fulfill({ headers: cors(), json: { hasAccess: true } });
+    if (u.pathname === '/web/services/user') return r.fulfill({ headers: cors(), json: { id: 'u1', firstName: 'Ana', lastName: 'Teste', email: 'ana@example.com' } });
+    if (u.pathname.endsWith('/has-active-subscription-web')) return r.fulfill({ headers: cors(), body: 'true', contentType: 'application/json' });
+    if (u.pathname.endsWith('/stop-active-player')) return r.fulfill({ headers: cors(), body: '' });
     if (u.pathname.endsWith('/playlist.m3u8')) {
       return r.fulfill({ headers: cors(), json: { url: 'https://cfvod.example/' + u.pathname.split('/')[5] + '/hls/master.m3u8' } });
     }
@@ -180,7 +183,7 @@ async function apiScenario(browser) {
   await press(page, 'ArrowLeft', 3);
   assert.strictEqual(await page.$eval('#tvf-home', (h) => h.classList.contains('tvf-nav-open')), true);
   const navLabels = await page.$$eval('.tvf-nav-label', (l) => l.map((x) => x.textContent));
-  assert.deepStrictEqual(navLabels, ['Buscar', 'Início', 'Canais', 'Categorias', 'Minha lista']);
+  assert.deepStrictEqual(navLabels, ['Buscar', 'Início', 'Canais', 'Categorias', 'Minha lista', 'Conta']);
   assert.match(await focused(page), /Início/);
   // Canais lista as marcas; cada uma abre uma grade de 5 colunas que carrega mais vídeos perto do fim
   await press(page, 'ArrowDown');
@@ -239,6 +242,23 @@ async function apiScenario(browser) {
   await page.evaluate(() => { for (let i = 0; i < 3; i++) window.hotgoTV.typeKey('del'); ['l', 'o', 'i'].forEach((k) => window.hotgoTV.typeKey(k)); });
   assert.deepStrictEqual(await page.$$eval('.tvf-chip .tvf-card-title', (c) => c.map((x) => x.textContent)), ['Loiras']);
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'search.png') });
+
+  // Conta: dados da conta e Sair (dois toques), que libera a vaga do aparelho e volta ao login por código
+  await page.evaluate(() => {
+    const n = [...document.querySelectorAll('.tvf-nav-item')].find((b) => b.textContent === 'Conta');
+    n.click();
+  });
+  await page.waitForFunction(() => /Ana Teste/.test(document.querySelector('.tvf-account') ? document.querySelector('.tvf-account').textContent : ''), null, { timeout: 3000 });
+  assert.match(await page.$eval('.tvf-account', (a) => a.textContent), /AssinaturaAtiva/);
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'account.png') });
+  assert.strictEqual(await focused(page), 'Sair da conta');
+  await press(page, 'Enter');
+  assert.strictEqual(await focused(page), 'Aperte OK de novo para sair');
+  const stopsBefore = calls.filter((c) => c.path.endsWith('/stop-active-player')).length;
+  await press(page, 'Enter');
+  await page.waitForSelector('#tvf-login.open', { timeout: 2000 });
+  assert.strictEqual(await page.evaluate(() => localStorage.getItem('access_token')), null);
+  assert.ok(calls.filter((c) => c.path.endsWith('/stop-active-player')).length > stopsBefore);
 
   assert.deepStrictEqual(errors, []);
   await page.close();
