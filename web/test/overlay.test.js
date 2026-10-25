@@ -18,7 +18,9 @@ async function press(page, key, times = 1) {
 
 const focused = (page) => page.evaluate(() => {
   const e = document.querySelector('.tvf-focus');
-  return e ? (e.textContent || e.tagName).trim().slice(0, 40) : null;
+  // nos cards, o que importa é o título (a miniatura tem a duração e embaixo vem o canal)
+  const t = e && e.querySelector('.tvf-card-title');
+  return e ? ((t || e).textContent || e.tagName).trim().slice(0, 40) : null;
 });
 
 // No hotgo.tv o Início vem da API (tab-layout) e o vídeo toca no player próprio.
@@ -45,11 +47,13 @@ async function apiScenario(browser) {
     if (u.pathname.endsWith('/tab-layout')) return r.fulfill({ headers: cors(), path: fixture });
     if (u.pathname.endsWith('/vods/category-paged')) {
       const pg = Number(u.searchParams.get('page'));
-      const items = Array.from({ length: 30 }, (_, i) => ({
-        id: 'c' + pg + '-' + i, type: 'vod', showOnWeb: true, image: 'https://img.example/c.jpg',
-        videoOnDemandInfos: [{ languageCode: 'pt', title: 'Canal ' + (pg * 30 + i + 1) }]
+      const size = Number(u.searchParams.get('pageSize'));
+      const total = size * 1.5;
+      const items = Array.from({ length: Math.min(size, total - pg * size) }, (_, i) => ({
+        id: 'c' + pg + '-' + i, type: 'vod', showOnWeb: true, image: 'https://img.example/c.jpg', duration: 754,
+        videoOnDemandInfos: [{ languageCode: 'pt', title: 'Canal ' + (pg * size + i + 1) }]
       }));
-      return r.fulfill({ headers: cors(), json: { page: pg, pageSize: 30, totalItems: 45, items: pg === 0 ? items : items.slice(0, 15) } });
+      return r.fulfill({ headers: cors(), json: { page: pg, pageSize: size, totalItems: total, items } });
     }
     if (u.pathname.endsWith('/reseller-web-categories')) {
       return r.fulfill({ headers: cors(), json: [
@@ -93,11 +97,11 @@ async function apiScenario(browser) {
   const look = await page.evaluate(() => {
     const f = document.querySelector('.tvf-card.tvf-focus');
     const other = document.querySelector('.tvf-card:not(.tvf-focus)');
-    return { f: !!f, title: f && getComputedStyle(f.querySelector('.tvf-card-title')).backgroundColor,
+    return { f: !!f, title: f && getComputedStyle(f.querySelector('.tvf-thumb')).boxShadow,
       op: f && getComputedStyle(f).opacity, otherOp: other && getComputedStyle(other).opacity };
   });
   assert.ok(look.f, 'nenhum card focado');
-  assert.strictEqual(look.title, 'rgb(229, 9, 20)');
+  assert.match(look.title, /rgb\(255, 255, 255\)/);
   assert.ok(look.f);
   await press(page, 'Enter');
   await page.waitForFunction(() => {
@@ -159,13 +163,14 @@ async function apiScenario(browser) {
   await press(page, 'Enter');
   assert.strictEqual(await focused(page), 'Outro');
   await press(page, 'Enter');
-  await page.waitForFunction(() => document.querySelectorAll('.tvf-card').length === 30, null, { timeout: 3000 });
+  await page.waitForFunction(() => document.querySelectorAll('.tvf-card').length === 32, null, { timeout: 3000 });
   assert.strictEqual(await page.$eval('.tvf-page-title', (h) => h.textContent), 'Outro');
   assert.strictEqual(await focused(page), 'Canal 1');
-  await press(page, 'ArrowDown', 5);
-  await page.waitForFunction(() => document.querySelectorAll('.tvf-card').length === 45, null, { timeout: 3000 });
+  assert.strictEqual(await page.$eval('.tvf-card .tvf-badge', (b) => b.textContent), '12:34');
+  await press(page, 'ArrowDown', 6);
+  await page.waitForFunction(() => document.querySelectorAll('.tvf-card').length === 48, null, { timeout: 3000 });
   await press(page, 'ArrowRight', 2);
-  assert.strictEqual(await focused(page), 'Canal 28');
+  assert.strictEqual(await focused(page), 'Canal 27');
   // Menu (☰) guarda o vídeo focado na Minha lista
   await page.evaluate(() => window.hotgoTV.toggleHome());
   assert.strictEqual(await page.$eval('#tvf-toast', (t) => t.textContent), 'Adicionado à Minha lista');

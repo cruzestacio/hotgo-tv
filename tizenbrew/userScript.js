@@ -105,16 +105,21 @@
     '.' + PREFIX + '-track{position:relative;overflow:hidden;padding:2.2vh 0}',
     '.' + PREFIX + '-rail{display:flex;padding:0 4vw;white-space:nowrap;will-change:transform;',
     '  transition:transform .2s ease-out}',
-    '.' + PREFIX + '-card{position:relative;flex:0 0 auto;width:18vw;margin-right:.8vw;border-radius:4px;overflow:hidden;',
-    '  background:#232323;transition:transform .15s ease-out}',
-    // card focado: cresce um pouco, moldura branca por dentro e título em destaque
-    '.' + PREFIX + '-card.' + PREFIX + '-focus{outline:none !important;z-index:2;transform:scale(1.08)}',
-    '.' + PREFIX + '-card.' + PREFIX + '-focus:after{content:"";position:absolute;left:0;top:0;right:0;bottom:0;',
-    '  border:.35vw solid #fff;border-radius:6px;pointer-events:none}',
-    '.' + PREFIX + '-card.' + PREFIX + '-focus .' + PREFIX + '-card-title{background:#e50914;color:#fff;font-weight:700}',
-    '.' + PREFIX + '-thumb{width:100%;padding-top:56.25%;background:#222 center/cover no-repeat}',
-    '.' + PREFIX + '-card-title{font-size:1vw;padding:.8vh .8vw;overflow:hidden;text-overflow:ellipsis;',
-    '  white-space:nowrap;color:#ddd}',
+    // cards no formato do YouTube: miniatura 16:9 grande e arredondada, título e detalhes embaixo
+    '.' + PREFIX + '-card{position:relative;flex:0 0 auto;width:26vw;margin-right:1.6vw;border-radius:1vw;',
+    '  white-space:normal}',
+    '.' + PREFIX + '-card.' + PREFIX + '-focus{outline:none !important;z-index:2}',
+    '.' + PREFIX + '-thumb{position:relative;width:100%;padding-top:56.25%;border-radius:1vw;overflow:hidden;',
+    '  background:#272727 center/cover no-repeat;transition:transform .15s ease-out}',
+    // foco: anel branco na miniatura (como no YouTube) e título em destaque
+    '.' + PREFIX + '-card.' + PREFIX + '-focus .' + PREFIX + '-thumb{box-shadow:0 0 0 .3vw #fff;transform:scale(1.03)}',
+    '.' + PREFIX + '-card-title{font-size:1.25vw;line-height:1.3;font-weight:500;color:#aaa;margin:1.2vh .2vw 0;',
+    '  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;max-height:3.3vw}',
+    '.' + PREFIX + '-card.' + PREFIX + '-focus .' + PREFIX + '-card-title{color:#fff;font-weight:700}',
+    '.' + PREFIX + '-card-meta{font-size:1vw;color:#888;margin:.5vh .2vw 0;white-space:nowrap;overflow:hidden;',
+    '  text-overflow:ellipsis}',
+    '.' + PREFIX + '-badge{position:absolute;right:.6vw;bottom:.6vw;background:rgba(0,0,0,.8);color:#fff;',
+    '  font-size:.95vw;font-weight:600;padding:.2vh .5vw;border-radius:.4vw}',
     // menu lateral: recolhido mostra só os ícones; com o foco nele, abre com os nomes
     '.' + PREFIX + '-nav{position:absolute;left:0;top:0;bottom:0;width:6vw;z-index:4;padding-top:4vh;overflow:hidden;',
     '  background:linear-gradient(90deg,rgba(0,0,0,.95),rgba(0,0,0,.55))}',
@@ -128,24 +133,30 @@
     '.' + PREFIX + '-nav-icon{flex:0 0 auto;width:2vw;height:2vw;margin:0 1.6vw 0 .6vw}',
     '.' + PREFIX + '-nav-icon svg{width:100%;height:100%;display:block}',
     '.' + PREFIX + '-card.' + PREFIX + '-brand .' + PREFIX + '-thumb{padding-top:70%;background-size:cover}',
+    '.' + PREFIX + '-brand-name{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;',
+    '  font-size:2vw;font-weight:900;color:#fff;letter-spacing:.03em}',
     '.' + PREFIX + '-nav-label{opacity:0}',
     '#' + PREFIX + '-home.' + PREFIX + '-nav-open .' + PREFIX + '-nav-label{opacity:1}',
     '.' + PREFIX + '-has-nav .' + PREFIX + '-rail{padding-left:8vw}',
     '.' + PREFIX + '-has-nav .' + PREFIX + '-row-title{margin-left:8vw}',
     '.' + PREFIX + '-has-nav .' + PREFIX + '-hero-info{left:8vw}',
-    '.' + PREFIX + '-has-nav .' + PREFIX + '-card{width:16vw}',
+    '.' + PREFIX + '-has-nav .' + PREFIX + '-card{width:25vw}',
+    '.' + PREFIX + '-has-nav .' + PREFIX + '-row.' + PREFIX + '-grid .' + PREFIX + '-card{width:19.5vw}',
     '.' + PREFIX + '-page-title{font-size:2.6vw;font-weight:800;margin:7vh 0 3vh 8vw}',
     '.' + PREFIX + '-message{margin:0 0 0 8vw;color:#aaa;font-size:1.4vw}',
-    '.' + PREFIX + '-card.' + PREFIX + '-tile{background:linear-gradient(135deg,#4a1020,#1c1c24)}',
+    '.' + PREFIX + '-card.' + PREFIX + '-tile,.' + PREFIX + '-card.' + PREFIX + '-key{background:linear-gradient(135deg,#4a1020,#1c1c24);',
+    '  overflow:hidden}',
+    '.' + PREFIX + '-card.' + PREFIX + '-key{background:#2a2a2a;border-radius:.6vw}',
+    '.' + PREFIX + '-tile.' + PREFIX + '-focus,.' + PREFIX + '-key.' + PREFIX + '-focus{box-shadow:0 0 0 .3vw #fff}',
     '.' + PREFIX + '-tile .' + PREFIX + '-thumb,.' + PREFIX + '-key .' + PREFIX + '-thumb{display:none}',
-    '.' + PREFIX + '-tile .' + PREFIX + '-card-title{font-size:1.5vw;font-weight:700;padding:5vh 1vw;text-align:center;',
+    '.' + PREFIX + '-tile .' + PREFIX + '-card-title{font-size:1.5vw;font-weight:700;padding:5vh 1vw;text-align:center;margin:0;max-height:none;',
     '  white-space:normal;color:#fff}',
     '.' + PREFIX + '-has-nav .' + PREFIX + '-card.' + PREFIX + '-key{width:4.4vw;margin-right:.6vw}',
     '.' + PREFIX + '-has-nav .' + PREFIX + '-card.' + PREFIX + '-key.wide{width:9.4vw}',
-    '.' + PREFIX + '-key .' + PREFIX + '-card-title{font-size:1.5vw;text-align:center;padding:1vh 0;color:#fff}',
+    '.' + PREFIX + '-key .' + PREFIX + '-card-title{font-size:1.5vw;text-align:center;padding:1vh 0;margin:0;color:#fff}',
     '.' + PREFIX + '-search-box{font-size:1.8vw;margin:0 0 2vh 8vw;padding:1.4vh 1.2vw;background:#1c1c24;',
     '  border-radius:6px;width:34vw;color:#fff}',
-    '.' + PREFIX + '-card .' + PREFIX + '-progress{height:.6vh;margin:0;border-radius:0}',
+    '.' + PREFIX + '-thumb .' + PREFIX + '-progress{position:absolute;left:0;right:0;bottom:0;height:.6vh;margin:0;border-radius:0}',
     '#' + PREFIX + '-toast{position:fixed;left:50%;bottom:6vh;transform:translateX(-50%);z-index:2147483647;',
     '  background:rgba(20,20,26,.95);color:#fff;font:600 1.3vw Roboto,Arial,sans-serif;padding:1.4vh 2vw;',
     '  border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none}',
@@ -1023,21 +1034,33 @@
     });
   }
 
+  function clock(secs) {
+    secs = Math.floor(secs);
+    var h = Math.floor(secs / 3600), m = Math.floor(secs / 60) % 60, s = secs % 60;
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
   function makeCard(item, cls) {
     var card = el('div', PREFIX + '-card' + (cls ? ' ' + PREFIX + '-' + cls : '') + (item.cls ? ' ' + item.cls : ''));
     card.setAttribute('tabindex', '-1');
     card.setAttribute(PREFIX + '-focusable', '');
     // as capas carregam conforme o foco chega perto (loadThumbs)
-    if (item.img) card.setAttribute(PREFIX + '-img', sized(item.img, 400));
-    card.appendChild(el('div', PREFIX + '-thumb'));
+    if (item.img) card.setAttribute(PREFIX + '-img', sized(item.img, 480));
+    var thumb = el('div', PREFIX + '-thumb');
+    card.appendChild(thumb);
+    // canal sem logo: o nome no lugar da imagem
+    if (!item.img && cls === 'brand') thumb.appendChild(el('span', PREFIX + '-brand-name', item.title));
+    var secs = item.dur || item.duration;
+    if (secs && !item.open) thumb.appendChild(el('span', PREFIX + '-badge', clock(secs)));
     if (item.progress) {
       var bar = el('div', PREFIX + '-progress');
       var fill = el('div');
       fill.style.width = Math.round(item.progress * 100) + '%';
       bar.appendChild(fill);
-      card.appendChild(bar);
+      thumb.appendChild(bar);
     }
     card.appendChild(el('div', PREFIX + '-card-title', item.title));
+    if (item.img && !item.open && item.group) card.appendChild(el('div', PREFIX + '-card-meta', item.group));
     card.onclick = function () {
       if (item.open) item.open();
       else openCard(item);
@@ -1066,7 +1089,7 @@
 
   function addGrid(scroll, items, cls, rowCls) {
     for (var i = 0; i < items.length; i += GRID_COLS) {
-      addRow(scroll, null, items.slice(i, i + GRID_COLS), cls, rowCls);
+      addRow(scroll, null, items.slice(i, i + GRID_COLS), cls, PREFIX + '-grid' + (rowCls ? ' ' + rowCls : ''));
       homeGrid[homeGrid.length - 1].keepCol = true;
     }
   }
@@ -1099,8 +1122,8 @@
 
   // ------------------------------------------------ telas do app (menu lateral, estilo Netflix)
 
-  var PAGE_SIZE = 30;   // múltiplo de GRID_COLS: cada página nova completa linhas inteiras
-  var GRID_COLS = 5;
+  var PAGE_SIZE = 32;   // múltiplo de GRID_COLS: cada página nova completa linhas inteiras
+  var GRID_COLS = 4;
   var page = { key: 'home' };
   var menu = [];
   var navItems = [];
@@ -1748,7 +1771,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.8.1',
+    version: '0.9.0',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,
