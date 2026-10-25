@@ -183,6 +183,20 @@
     '  border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none}',
     '#' + PREFIX + '-toast.show{opacity:1}',
     '.' + PREFIX + '-hero-meta{font-size:1.2vw;color:#ccc;margin:0 0 2vh}',
+    // tela do vídeo: capa grande à direita, informações e botões à esquerda (Netflix/YouTube)
+    '.' + PREFIX + '-row.' + PREFIX + '-detail{position:relative;height:72vh;margin:0 0 2vh;background:#000 right top/72% auto no-repeat}',
+    '.' + PREFIX + '-detail:before{content:"";position:absolute;left:0;top:0;bottom:0;right:0;',
+    '  background:linear-gradient(90deg,#0f0f0f 30%,rgba(15,15,15,.85) 45%,rgba(15,15,15,0) 75%),linear-gradient(transparent 70%,#0f0f0f)}',
+    '.' + PREFIX + '-detail-info{position:absolute;left:8vw;top:12vh;width:44vw;z-index:1}',
+    '.' + PREFIX + '-detail-title{font-size:3vw;font-weight:800;line-height:1.15;margin:0 0 1.5vh}',
+    '.' + PREFIX + '-detail-meta{font-size:1.35vw;color:#ccc;margin:0 0 2vh}',
+    '.' + PREFIX + '-detail-progress{width:22vw;margin:0 0 2.5vh}',
+    '.' + PREFIX + '-detail-buttons{display:flex;margin:0 0 3vh}',
+    '.' + PREFIX + '-dbtn{background:rgba(255,255,255,.14);color:#fff;font-size:1.35vw;font-weight:700;',
+    '  padding:1.6vh 2vw;border-radius:.6vw;margin-right:1vw;white-space:nowrap}',
+    '.' + PREFIX + '-dbtn.' + PREFIX + '-focus{background:#fff !important;color:#000;outline:none !important}',
+    '.' + PREFIX + '-detail-desc{font-size:1.3vw;line-height:1.45;color:#ddd;margin:0;display:-webkit-box;',
+    '  -webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}',
     '.' + PREFIX + '-hint{position:fixed;right:2vw;bottom:2vh;font-size:.9vw;color:#aaa;z-index:3;',
     '  background:rgba(0,0,0,.7);padding:.6vh 1vw;border-radius:4px}',
     'video.' + PREFIX + '-max{position:fixed !important;left:0 !important;top:0 !important;',
@@ -638,6 +652,18 @@
     return url + '?width=' + w;
   }
 
+  function descFor(v) {
+    var infos = v.videoOnDemandInfos || v.infos || [];
+    var l = lang();
+    var best = '';
+    for (var i = 0; i < infos.length; i++) {
+      var d = (infos[i].description || infos[i].shortDescription || '').trim();
+      if (d && infos[i].languageCode === l) return d.slice(0, 400);
+      if (d && !best) best = d;
+    }
+    return best.slice(0, 400);
+  }
+
   function toItem(v) {
     if (!v || !v.id || !v.image) return null;
     if (v.type && v.type !== 'vod' && v.type !== 'channel') return null;
@@ -647,7 +673,9 @@
       title: titleFor(v),
       img: v.image,
       backdrop: v.backgroundImage || v.image,
-      duration: v.duration || 0
+      duration: v.duration || 0,
+      desc: descFor(v),
+      year: v.releasedYear || 0
     };
   }
 
@@ -911,7 +939,8 @@
   }
 
   function slim(item) {
-    return { id: item.id, type: item.type || 'vod', title: item.title, img: item.img, backdrop: item.backdrop };
+    return { id: item.id, type: item.type || 'vod', title: item.title, img: item.img, backdrop: item.backdrop,
+             duration: item.duration || 0, desc: item.desc || '', year: item.year || 0, group: item.group || '' };
   }
 
   function inList(id) {
@@ -926,6 +955,7 @@
     saveJson(LIST_KEY, list.slice(0, 200));
     toast(added ? 'Adicionado à Minha lista' : 'Removido da Minha lista');
     updateListButton();
+    updateDetailList();
     if (!added && page.key === 'list') refresh();
   }
 
@@ -965,7 +995,9 @@
     var dur = Math.max(0, Number(durMs) || 0) / 1000;
     if (dur && pos > dur * 0.95) pos = -1;
     remember(lastPlayed, pos, dur);
-    if (homeOpen && page.key === 'home') refresh();
+    // volta para a tela de onde o vídeo saiu (Início ou a tela do vídeo), já com o progresso novo
+    if (homeOpen) refresh();
+    else if (appMode()) { buildHome(); openHome(); }
   }
 
   function continueItems() {
@@ -1154,10 +1186,101 @@
   }
 
   function openCard(card) {
+    // como na Netflix: o card abre a tela do vídeo; o "Continuar assistindo" vai direto para o player
+    if (!card.link && hasNav() && homeOpen && !card.progress) { openDetail(card); return; }
     if (!card.link) { openItem(card); return; }
     closeHome();
     if (document.contains(card.link)) card.link.click();
     else window.location.href = card.href;
+  }
+
+  // ------------------------------------------------- tela do vídeo (detalhes)
+
+  function relatedTo(item) {
+    var pool = [];
+    if (page.items && page.items.length) pool = page.items;
+    else if (page.key === 'detail') pool = page.related;
+    else {
+      var rail = current && current.parentNode;
+      var cards = rail ? rail.children : [];
+      for (var i = 0; i < cards.length; i++) if (cards[i].tvfItem) pool.push(cards[i].tvfItem);
+    }
+    return pool.filter(function (it) { return it.id && it.id !== item.id && it.img && !it.open; }).slice(0, 20);
+  }
+
+  function openDetail(item) {
+    var related = relatedTo(item);
+    if (page.key === 'detail') related = related.concat([page.item]).filter(function (it) { return it.id !== item.id; });
+    page = { key: 'detail', item: item, related: related, prev: page, navKey: page.navKey || page.key };
+    buildHome();
+    openHome();
+  }
+
+  function closeDetail() {
+    page = page.prev || { key: 'home' };
+    buildHome();
+    openHome();
+  }
+
+  function resumeAt(item) {
+    var at = 0;
+    loadJson(HISTORY_KEY).forEach(function (h) { if (h.id === item.id && !at && h.pos > 0) at = h.pos; });
+    return at;
+  }
+
+  function updateDetailList() {
+    var b = home && home.querySelector('.' + PREFIX + '-detail-list');
+    if (b && page.item) b.textContent = inList(page.item.id) ? '✓ Na minha lista' : '+ Minha lista';
+  }
+
+  function detailButton(text, cls, action) {
+    var b = el('div', PREFIX + '-dbtn' + (cls ? ' ' + cls : ''), text);
+    b.setAttribute('tabindex', '-1');
+    b.setAttribute(PREFIX + '-focusable', '');
+    b.onclick = action;
+    return b;
+  }
+
+  function renderDetail(scroll) {
+    var item = page.item;
+    var top = el('section', PREFIX + '-row ' + PREFIX + '-detail');
+    top.style.backgroundImage = 'url("' + sized(item.backdrop || item.img, 1280).replace(/"/g, '%22') + '")';
+    var info = el('div', PREFIX + '-detail-info');
+    info.appendChild(el('h1', PREFIX + '-detail-title', item.title));
+    var meta = [];
+    if (item.year) meta.push(String(item.year));
+    var secs = item.duration || item.dur;
+    if (secs) meta.push(clock(secs));
+    if (item.group) meta.push(item.group);
+    if (meta.length) info.appendChild(el('p', PREFIX + '-detail-meta', meta.join('  ·  ')));
+    var at = resumeAt(item);
+    if (at && secs) {
+      var bar = el('div', PREFIX + '-progress ' + PREFIX + '-detail-progress');
+      var fill = el('div');
+      fill.style.width = Math.min(100, Math.round(at / secs * 100)) + '%';
+      bar.appendChild(fill);
+      info.appendChild(bar);
+    }
+    var buttons = el('div', PREFIX + '-detail-buttons');
+    var row = [];
+    row.push(detailButton(at ? '▶  Continuar de ' + clock(at) : '▶  Assistir', 'primary', function () { openItem(item); }));
+    if (at) {
+      row.push(detailButton('↺  Do início', '', function () {
+        // esquece o ponto salvo para o player começar do zero
+        saveJson(HISTORY_KEY, loadJson(HISTORY_KEY).filter(function (h) { return h.id !== item.id; }));
+        item.pos = 0;
+        openItem(item);
+      }));
+    }
+    row.push(detailButton(inList(item.id) ? '✓ Na minha lista' : '+ Minha lista', PREFIX + '-detail-list', function () { toggleList(item); }));
+    row.forEach(function (b) { buttons.appendChild(b); });
+    info.appendChild(buttons);
+    if (item.desc) info.appendChild(el('p', PREFIX + '-detail-desc', item.desc));
+    top.appendChild(info);
+    scroll.appendChild(top);
+    homeGrid.push(row);
+    homeGrid[homeGrid.length - 1].keepCol = true;
+    if (page.related.length) addRow(scroll, 'Vídeos parecidos', page.related);
   }
 
   // O destaque do topo mostra o vídeo focado (como na Netflix), com um respiro para não
@@ -1620,6 +1743,7 @@
       catalog.forEach(function (r) { addRow(scroll, r.title, r.items.slice(0, 30)); });
       return;
     }
+    if (page.key === 'detail') { renderDetail(scroll); return; }
     if (page.key === 'channels') {
       scroll.appendChild(el('h1', PREFIX + '-page-title', 'Canais'));
       addGrid(scroll, menu.map(function (ch) {
@@ -1799,7 +1923,7 @@
     var top = home.classList.contains(PREFIX + '-has-nav') ? 0.12 : 0.3;
     var y = row ? Math.max(0, row.offsetTop - window.innerHeight * top) : 0;
     // na busca o teclado fica parado na tela; só os resultados fazem a tela subir
-    if (row && row.classList.contains(PREFIX + '-kb-row')) y = 0;
+    if (row && (row.classList.contains(PREFIX + '-kb-row') || row.classList.contains(PREFIX + '-detail'))) y = 0;
     if (scroll.tvfY !== y) {
       scroll.tvfY = y;
       scroll.style.transform = 'translate3d(0,' + (-y) + 'px,0)';
@@ -1932,6 +2056,7 @@
     }
     if (homeOpen && appMode()) {
       // como na Netflix: Voltar sobe para a tela anterior e, no Início, pede para sair
+      if (page.key === 'detail') { closeDetail(); return true; }
       if (page.parent) { goPage(page.parent); return true; }
       if (page.key !== 'home') { goPage('home'); return true; }
       // no Início, Voltar abre o menu (YouTube); com o menu aberto, Voltar pede para sair
@@ -2076,7 +2201,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.12.0',
+    version: '0.12.1',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,

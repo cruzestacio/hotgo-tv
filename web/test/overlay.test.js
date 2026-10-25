@@ -105,6 +105,19 @@ async function apiScenario(browser) {
   assert.ok(look.f, 'nenhum card focado');
   assert.match(look.title, /rgb\(255, 255, 255\)/);
   assert.ok(look.f);
+  // OK no card abre a tela do vídeo (como na Netflix); dali o Assistir toca
+  await press(page, 'Enter');
+  await page.waitForSelector('.tvf-detail .tvf-detail-title', { timeout: 2000 });
+  assert.strictEqual(await page.$eval('.tvf-detail-title', (h) => h.textContent), first);
+  assert.strictEqual(await focused(page), '▶  Assistir');
+  const detailRows = await page.$$eval('.tvf-row-title', (h) => h.map((x) => x.textContent));
+  assert.deepStrictEqual(detailRows, ['Vídeos parecidos']);
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'detail.png') });
+  // Voltar sai da tela do vídeo e devolve o foco ao mesmo card
+  await page.evaluate(() => window.hotgoTV.back());
+  assert.strictEqual(await focused(page), first);
+  await press(page, 'Enter');
+  await page.waitForSelector('.tvf-detail', { timeout: 2000 });
   await press(page, 'Enter');
   await page.waitForFunction(() => {
     const v = document.getElementById('tvf-player');
@@ -133,6 +146,10 @@ async function apiScenario(browser) {
   await page.waitForTimeout(200);
   assert.strictEqual(await page.$eval('#tvf-player', (v) => v.style.display), 'none');
   assert.strictEqual(await page.$eval('#tvf-home', (h) => h.classList.contains('open')), true);
+  // o vídeo saiu da tela de detalhes: Voltar do player volta para ela, e mais um Voltar para o Início
+  assert.ok(await page.$('.tvf-detail'));
+  await page.evaluate(() => window.hotgoTV.back());
+  assert.ok(!(await page.$('.tvf-detail')));
 
   // modo app (logado): sem botão do site, o destaque segue o foco, e Voltar no Início não mostra o site
   assert.ok(!(await page.$$eval('.tvf-bar .tvf-btn', (b) => b.map((x) => x.textContent))).includes('Site completo'));
@@ -323,6 +340,8 @@ async function slowCatalogScenario(browser) {
   // check-access nega e o playlist recusa: no modo app fica no Início com um aviso (o player do site quebra)
   await page.route('https://cf.streann.tech/**/check-access**', (r) => r.fulfill({ headers: cors(), json: { hasAccess: false } }));
   await page.route('https://cf.streann.tech/**/playlist.m3u8**', (r) => r.fulfill({ status: 403, headers: cors(), body: '{}' }));
+  await press(page, 'Enter');
+  await page.waitForSelector('.tvf-detail', { timeout: 2000 });
   await press(page, 'Enter');
   await page.waitForFunction(() => /assinatura/.test((document.getElementById('tvf-toast') || {}).textContent || ''), null, { timeout: 3000 });
   assert.match(page.url(), /\/pt\/home$/);
