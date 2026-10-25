@@ -12,8 +12,8 @@ android {
         // Fire OS 5 (Fire TV Stick 2ª geração) é API 22; Fire OS 7/8 vêm acima disso
         minSdk = 22
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
         buildConfigField("String", "START_URL", "\"https://www.hotgo.tv/\"")
     }
 

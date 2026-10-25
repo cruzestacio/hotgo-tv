@@ -55,12 +55,14 @@
   var catalog = null;
   var catalogLoading = false;
   var player = null;
+  var pointerDirty = true;
+  var homeGrid = [];
 
   // ---------------------------------------------------------------- estilos
 
   var CSS = [
     '.' + PREFIX + '-focus{outline:4px solid #ff2d55 !important;outline-offset:2px !important;',
-    '  box-shadow:0 0 0 8px rgba(255,45,85,.35) !important;border-radius:6px;position:relative;z-index:1}',
+    '  border-radius:6px;position:relative;z-index:1}',
     'html.' + PREFIX + '-tv ::-webkit-scrollbar{display:none}',
     '#' + PREFIX + '-home{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2147483640;',
     '  background:#0b0b0f;color:#fff;overflow:hidden;font-family:Roboto,Arial,sans-serif;display:none}',
@@ -82,7 +84,7 @@
     '.' + PREFIX + '-row-title{font-size:1.6vw;font-weight:700;margin:0 4vw 1.4vh}',
     '.' + PREFIX + '-track{position:relative;display:flex;overflow:hidden;padding:1.2vh 4vw;white-space:nowrap}',
     '.' + PREFIX + '-card{flex:0 0 auto;width:18vw;margin-right:1vw;border-radius:6px;overflow:hidden;',
-    '  background:#1c1c24;transition:transform .15s}',
+    '  background:#1c1c24}',
     '.' + PREFIX + '-card.' + PREFIX + '-focus{transform:scale(1.08);z-index:2}',
     '.' + PREFIX + '-thumb{width:100%;padding-top:56.25%;background:#222 center/cover no-repeat}',
     '.' + PREFIX + '-card-title{font-size:1vw;padding:.8vh .8vw;overflow:hidden;text-overflow:ellipsis;',
@@ -124,6 +126,8 @@
     if (e.disabled) return false;
     var r = e.getBoundingClientRect();
     if (r.width < 4 || r.height < 4) return false;
+    // longe da tela não entra na conta (getComputedStyle é caro no Fire TV Stick)
+    if (r.bottom < -window.innerHeight || r.top > window.innerHeight * 2) return false;
     var s = window.getComputedStyle(e);
     if (s.visibility === 'hidden' || s.display === 'none' || Number(s.opacity) === 0) return false;
     return true;
@@ -162,7 +166,10 @@
 
   function candidates() {
     var root = homeOpen ? home : document;
-    if (!homeOpen) markPointerElements(document.body);
+    if (!homeOpen && pointerDirty) {
+      pointerDirty = false;
+      markPointerElements(document.body);
+    }
     var all = root.querySelectorAll(FOCUSABLE);
     var out = [];
     for (var i = 0; i < all.length; i++) {
@@ -229,7 +236,7 @@
 
   function scrollIntoView(e) {
     try {
-      e.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+      e.scrollIntoView({ block: 'center', inline: 'center' });
     } catch (err) {
       e.scrollIntoView(false);
     }
@@ -247,7 +254,46 @@
     setFocus(best || list[0]);
   }
 
+  // No Início a navegação é por linha/coluna, sem medir a tela a cada tecla
+  function homeMove(dir) {
+    var r = Number(current && current.getAttribute(PREFIX + '-r'));
+    var c = Number(current && current.getAttribute(PREFIX + '-c'));
+    if (!current || !home.contains(current) || isNaN(r) || !homeGrid[r]) {
+      setFocus(homeGrid[1] ? homeGrid[1][0] : homeGrid[0][0]);
+      return;
+    }
+    if (dir === 'left') c--;
+    else if (dir === 'right') c++;
+    else {
+      r += dir === 'down' ? 1 : -1;
+      if (!homeGrid[r]) return;
+      // volta para a coluna em que a linha estava, como na Netflix
+      var last = homeGrid[r].lastCol;
+      c = typeof last === 'number' ? last : 0;
+    }
+    var row = homeGrid[r];
+    c = Math.max(0, Math.min(row.length - 1, c));
+    row.lastCol = c;
+    setFocus(row[c]);
+    loadThumbs(r, c);
+  }
+
+  function loadThumbs(r, c) {
+    for (var i = Math.max(0, r - 1); i <= r + 2 && i < homeGrid.length; i++) {
+      var row = homeGrid[i];
+      var start = i === r ? c : (row.lastCol || 0);
+      for (var j = 0; j < row.length && j <= start + 8; j++) {
+        var url = row[j].getAttribute(PREFIX + '-img');
+        if (url) {
+          row[j].firstChild.style.backgroundImage = 'url("' + url.replace(/"/g, '%22') + '")';
+          row[j].removeAttribute(PREFIX + '-img');
+        }
+      }
+    }
+  }
+
   function move(dir) {
+    if (homeOpen && homeGrid.length) { homeMove(dir); return; }
     if (!current || !document.contains(current) || !isVisible(current) ||
         (homeOpen && !home.contains(current))) {
       firstFocus();
@@ -267,7 +313,7 @@
     } else if (!homeOpen) {
       // nada na direção: rola a página para revelar mais conteúdo
       var dy = dir === 'down' ? 0.6 : dir === 'up' ? -0.6 : 0;
-      if (dy) window.scrollBy({ top: window.innerHeight * dy, behavior: 'smooth' });
+      if (dy) window.scrollBy(0, window.innerHeight * dy);
     }
   }
 
@@ -564,6 +610,15 @@
     else window.location.href = card.href;
   }
 
+  function indexGrid() {
+    homeGrid.forEach(function (gridRow, r) {
+      gridRow.forEach(function (e, c) {
+        e.setAttribute(PREFIX + '-r', r);
+        e.setAttribute(PREFIX + '-c', c);
+      });
+    });
+  }
+
   function buildHome() {
     var rows = catalog;
     var cards = rows ? [] : collectCards();
@@ -589,6 +644,7 @@
     };
     bar.appendChild(btnSite);
     bar.appendChild(btnReload);
+    homeGrid = [[btnSite, btnReload]];
     home.appendChild(bar);
 
     var hint = el('div', PREFIX + '-hint', 'Menu/vermelho: Início  ·  Voltar: sair desta tela');
@@ -601,6 +657,7 @@
       info.appendChild(el('p', null, 'Use "Site completo" para navegar pelo site e abra o Início de novo.'));
       empty.appendChild(info);
       scroll.appendChild(empty);
+      indexGrid();
       return 0;
     }
 
@@ -611,6 +668,7 @@
     var play = el('button', PREFIX + '-btn primary', '▶ Assistir');
     play.onclick = function () { openCard(cards[0]); };
     heroInfo.appendChild(play);
+    homeGrid.push([play]);
     hero.appendChild(heroInfo);
     scroll.appendChild(hero);
 
@@ -624,12 +682,16 @@
       var row = el('section', PREFIX + '-row');
       row.appendChild(el('h2', PREFIX + '-row-title', name));
       var track = el('div', PREFIX + '-track');
+      var gridRow = [];
+      homeGrid.push(gridRow);
       groups[name].forEach(function (c) {
         var card = el('div', PREFIX + '-card');
         card.setAttribute('tabindex', '-1');
         card.setAttribute(PREFIX + '-focusable', '');
+        // as capas carregam conforme o foco chega perto (loadThumbs)
+        card.setAttribute(PREFIX + '-img', c.img);
+        gridRow.push(card);
         var thumb = el('div', PREFIX + '-thumb');
-        thumb.style.backgroundImage = 'url("' + c.img.replace(/"/g, '%22') + '")';
         card.appendChild(thumb);
         card.appendChild(el('div', PREFIX + '-card-title', c.title));
         card.onclick = function () { openCard(c); };
@@ -638,6 +700,8 @@
       row.appendChild(track);
       scroll.appendChild(row);
     });
+    indexGrid();
+    loadThumbs(2, 0);
     return cards.length;
   }
 
@@ -850,7 +914,7 @@
     window.addEventListener('keydown', onKey, true);
     new MutationObserver(function (muts) {
       for (var i = 0; i < muts.length; i++) {
-        if (!home || !home.contains(muts[i].target)) { maybeAutoHome(); return; }
+        if (!home || !home.contains(muts[i].target)) { pointerDirty = true; maybeAutoHome(); return; }
       }
     }).observe(document.body, { childList: true, subtree: true });
     loadCatalog(function () { maybeAutoHome(); });
@@ -859,7 +923,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.2.0',
+    version: '0.3.0',
     openItem: openItem,
     reloadCatalog: loadCatalog,
     toggleHome: toggleHome,
