@@ -54,7 +54,22 @@ Funciona pelo [TizenBrew](https://github.com/reisxd/TizenBrew), que roda módulo
 1. Instale o TizenBrew na TV seguindo o guia do projeto (modo desenvolvedor da TV + instalação pelo computador).
 2. No TizenBrew, abra o gerenciador de módulos e adicione este repositório como módulo do GitHub, ou o pacote npm,
    se ele for publicado. O TizenBrew baixa o módulo por um CDN público, então o repositório (ou o pacote) precisa ser público.
-3. O app **HotGo TV** aparece na tela do TizenBrew.
+   No gerenciador de módulos, escolha **Add GitHub Module** e mande o texto `cruzestacio/hotgo-tv` de uma vez
+   (o `gh/` o TizenBrew põe sozinho, e ele grava assim que o campo perde o foco; pelo app SmartThings, cole o texto).
+3. O app **HotGo TV** aparece na tela do TizenBrew. Para ele abrir, o Host PC IP do modo desenvolvedor tem que ser `127.0.0.1`.
+   As versões novas do módulo chegam sozinhas.
+
+### Atalho na tela inicial
+
+`tizen/launcher` é um app mínimo, "HotGo TV", que pede ao TizenBrew para abrir o módulo direto, sem passar
+pela tela dele. Para gerar e instalar (Host PC IP apontando para o computador durante a instalação):
+
+```sh
+node scripts/build-tizen-launcher.js   # gera hotgo-tv-samsung.wgt (precisa do Node e de internet)
+```
+
+Depois instale o `.wgt` pela conexão de desenvolvedor da TV (sdb/`tizen install`, ou o TizenBrew Installer)
+e volte o Host PC IP para `127.0.0.1`.
 
 ## Desenvolvimento
 

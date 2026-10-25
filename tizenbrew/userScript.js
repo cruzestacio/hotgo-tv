@@ -19,7 +19,7 @@
 
   var PREFIX = 'tvf';
   var SEEK_STEP = 10;
-  var OSD_TIMEOUT = 3000;
+  var OSD_TIMEOUT = 5000;
   var MIN_CARDS_FOR_HOME = 6;
 
   // Configuração pública que o próprio site do HotGo usa (main-es2015.*.js)
@@ -219,12 +219,33 @@
     '.' + PREFIX + '-login-url{font-size:3vw;font-weight:700;margin:1vh 0 3vh}',
     '.' + PREFIX + '-login-code{font-size:7vw;font-weight:800;letter-spacing:.3em;margin:2vh 0}',
     '.' + PREFIX + '-login-status{font-size:1.3vw;color:#999;margin:0 0 4vh}',
-    '#' + PREFIX + '-osd{position:fixed;left:0;right:0;bottom:0;z-index:2147483646;padding:4vh 4vw;',
-    '  background:linear-gradient(transparent,rgba(0,0,0,.9));color:#fff;font-family:Roboto,Arial,sans-serif;',
-    '  font-size:1.4vw;opacity:0;transition:opacity .25s;pointer-events:none}',
+    // controles do vídeo como no player do Fire TV (YouTube): título em cima, barra vermelha embaixo
+    '#' + PREFIX + '-osd{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2147483646;',
+    '  color:#fff;font-family:Roboto,Arial,sans-serif;opacity:0;transition:opacity .25s;pointer-events:none}',
     '#' + PREFIX + '-osd.show{opacity:1}',
-    '.' + PREFIX + '-progress{height:.8vh;background:rgba(255,255,255,.25);border-radius:1vh;margin-top:1.5vh}',
-    '.' + PREFIX + '-progress div{height:100%;background:#ff2d55;border-radius:1vh;width:0}'
+    '.' + PREFIX + '-osd-top{position:absolute;left:0;right:0;top:0;padding:6vh 5vw 12vh;font-size:3.7vh;',
+    '  font-weight:700;background:linear-gradient(rgba(0,0,0,.8),transparent);text-shadow:0 1px 4px #000;',
+    '  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.' + PREFIX + '-osd-bottom{position:absolute;left:0;right:0;bottom:0;padding:12vh 5vw 6vh;',
+    '  background:linear-gradient(transparent,rgba(0,0,0,.85))}',
+    '.' + PREFIX + '-osd-times{display:flex;justify-content:space-between;font-size:2.4vh;margin-top:1.6vh;',
+    '  text-shadow:0 1px 3px #000}',
+    '.' + PREFIX + '-osd-center{position:absolute;left:50%;top:50%;width:13vh;height:13vh;margin:-6.5vh 0 0 -6.5vh;',
+    '  border-radius:50%;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;',
+    '  font-size:5vh;line-height:1}',
+    '#' + PREFIX + '-osd.paused .' + PREFIX + '-osd-center,#' + PREFIX + '-osd.seeking .' + PREFIX + '-osd-center{display:flex}',
+    '#' + PREFIX + '-osd.seeking .' + PREFIX + '-osd-center{width:auto;border-radius:7vh;padding:0 4vh;font-size:3.6vh;font-weight:700}',
+    '#' + PREFIX + '-spinner{position:fixed;left:50%;top:50%;width:9vh;height:9vh;margin:-4.5vh 0 0 -4.5vh;',
+    '  z-index:2147483646;border:.8vh solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;',
+    '  display:none;animation:' + PREFIX + '-spin .9s linear infinite;pointer-events:none}',
+    '#' + PREFIX + '-spinner.show{display:block}',
+    '@keyframes ' + PREFIX + '-spin{to{transform:rotate(360deg)}}',
+    '.' + PREFIX + '-progress{position:relative;height:.7vh;background:rgba(255,255,255,.28)}',
+    '.' + PREFIX + '-progress-buf,.' + PREFIX + '-progress-played{position:absolute;left:0;top:0;bottom:0;width:0}',
+    '.' + PREFIX + '-progress-buf{background:rgba(255,255,255,.45)}',
+    '.' + PREFIX + '-progress-played{background:#f00}',
+    '.' + PREFIX + '-progress-dot{position:absolute;top:50%;left:0;width:2.2vh;height:2.2vh;margin:-1.1vh 0 0 -1.1vh;',
+    '  border-radius:50%;background:#fff}'
   ].join('\n');
 
   function injectStyle() {
@@ -1091,8 +1112,20 @@
       player.id = PREFIX + '-player';
       player.setAttribute('playsinline', '');
       player.addEventListener('error', function () {
+        if (!player.getAttribute('src')) return;
         if (window.console) console.warn('[hotgoTV] erro no vídeo', player.error && player.error.code);
+        toast('Não consegui tocar este vídeo. Tente de novo.', 5000);
+        if (maxVideo === player) back();
       });
+      // carregando: bolinha girando no meio, como no Fire TV
+      player.addEventListener('waiting', function () { if (maxVideo === player) setSpinner(true); });
+      player.addEventListener('seeking', function () { if (maxVideo === player) setSpinner(true); });
+      player.addEventListener('playing', function () { setSpinner(false); });
+      player.addEventListener('seeked', function () { if (!player.paused) setSpinner(false); });
+      player.addEventListener('canplay', function () { if (player.paused) setSpinner(false); });
+      player.addEventListener('pause', function () { if (maxVideo === player) showOsd(); });
+      // no fim, volta para onde o vídeo foi aberto (o "Continuar assistindo" marca como visto)
+      player.addEventListener('ended', function () { if (maxVideo === player) back(); });
       document.body.appendChild(player);
     }
     player.title = title || '';
@@ -1105,6 +1138,7 @@
     }
     player.style.display = 'block';
     maximize(player);
+    setSpinner(true);
     updateCover();
     var p = player.play();
     if (p && p.catch) p.catch(function () {});
@@ -2068,10 +2102,15 @@
   function restore() {
     if (maxVideo) maxVideo.classList.remove(PREFIX + '-max');
     maxVideo = null;
+    clearTimeout(seekTimer);
+    seekTarget = null;
+    clearInterval(osdTick);
+    setSpinner(false);
     if (osd) osd.classList.remove('show');
   }
 
   function fmt(t) {
+    if (isNaN(t)) return '0:00';
     if (!isFinite(t)) return 'AO VIVO';
     t = Math.max(0, Math.floor(t));
     var h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60;
@@ -2079,26 +2118,84 @@
     return (h ? h + ':' : '') + mm + ':' + ss;
   }
 
+  // Controles do vídeo como no player nativo do Fire TV: título em cima, barra vermelha com
+  // bolinha e tempos embaixo, ícone de pausa no meio. Somem sozinhos com o vídeo rodando.
+  function buildOsd() {
+    osd = el('div');
+    osd.id = PREFIX + '-osd';
+    osd.appendChild(el('div', PREFIX + '-osd-top'));
+    osd.appendChild(el('div', PREFIX + '-osd-center'));
+    var bottom = el('div', PREFIX + '-osd-bottom');
+    var bar = el('div', PREFIX + '-progress');
+    bar.appendChild(el('div', PREFIX + '-progress-buf'));
+    bar.appendChild(el('div', PREFIX + '-progress-played'));
+    bar.appendChild(el('div', PREFIX + '-progress-dot'));
+    bottom.appendChild(bar);
+    var times = el('div', PREFIX + '-osd-times');
+    times.appendChild(el('span'));
+    times.appendChild(el('span'));
+    bottom.appendChild(times);
+    osd.appendChild(bottom);
+    document.body.appendChild(osd);
+  }
+
+  function part(cls) { return osd.querySelector('.' + PREFIX + '-' + cls); }
+
+  function paintOsd() {
+    var v = activeVideo();
+    if (!v || !osd) return;
+    var dur = v.duration;
+    var t = seekTarget !== null ? seekTarget : v.currentTime;
+    var pct = isFinite(dur) && dur > 0 ? Math.min(100, 100 * t / dur) : 100;
+    var buf = 0;
+    try { if (v.buffered.length) buf = v.buffered.end(v.buffered.length - 1); } catch (err) { /* sem buffer */ }
+    part('osd-top').textContent = v.title || '';
+    part('progress-played').style.width = pct + '%';
+    part('progress-dot').style.left = pct + '%';
+    part('progress-buf').style.width = isFinite(dur) && dur > 0 ? Math.min(100, 100 * buf / dur) + '%' : '0';
+    var times = part('osd-times');
+    times.firstChild.textContent = fmt(t);
+    times.lastChild.textContent = fmt(dur);
+    var center = part('osd-center');
+    if (seekTarget !== null) {
+      var d = Math.round(seekTarget - v.currentTime);
+      center.textContent = (d < 0 ? '◀◀ −' : '▶▶ +') + fmt(Math.abs(d));
+    } else {
+      center.textContent = v.paused ? '❚❚' : '▶';
+    }
+    osd.classList.toggle('paused', v.paused && seekTarget === null);
+    osd.classList.toggle('seeking', seekTarget !== null);
+  }
+
   function showOsd() {
     var v = activeVideo();
     if (!v) return;
-    if (!osd) {
-      osd = el('div');
-      osd.id = PREFIX + '-osd';
-      osd.appendChild(el('div', PREFIX + '-osd-text'));
-      var bar = el('div', PREFIX + '-progress');
-      bar.appendChild(el('div'));
-      osd.appendChild(bar);
-      document.body.appendChild(osd);
-    }
-    var state = v.paused ? '❚❚ Pausado' : '▶';
-    osd.firstChild.textContent = state + '   ' + fmt(v.currentTime) + ' / ' + fmt(v.duration) +
-      '      ◀◀ ▶▶ ' + SEEK_STEP + 's  ·  OK: pausar  ·  Voltar: sair';
-    osd.lastChild.firstChild.style.width = isFinite(v.duration) && v.duration > 0
-      ? (100 * v.currentTime / v.duration) + '%' : '100%';
+    if (!osd) buildOsd();
+    paintOsd();
     osd.classList.add('show');
     clearTimeout(osdTimer);
-    osdTimer = setTimeout(function () { if (osd) osd.classList.remove('show'); }, OSD_TIMEOUT);
+    clearInterval(osdTick);
+    osdTick = setInterval(paintOsd, 500);
+    osdTimer = setTimeout(hideOsd, OSD_TIMEOUT);
+  }
+
+  function hideOsd() {
+    var v = activeVideo();
+    // pausado, os controles ficam na tela (como no YouTube)
+    if (v && v.paused && maxVideo) { osdTimer = setTimeout(hideOsd, OSD_TIMEOUT); return; }
+    clearInterval(osdTick);
+    if (osd) osd.classList.remove('show');
+  }
+
+  function setSpinner(on) {
+    var sp = document.getElementById(PREFIX + '-spinner');
+    if (!sp) {
+      if (!on) return;
+      sp = el('div');
+      sp.id = PREFIX + '-spinner';
+      document.body.appendChild(sp);
+    }
+    sp.classList.toggle('show', !!on);
   }
 
   function playPause() {
@@ -2114,12 +2211,40 @@
     return true;
   }
 
+  // Segurar a seta acelera (10 s, 30 s, 60 s), como no Fire TV. O destino só é aplicado quando
+  // a tecla para: cada busca num HLS recarrega trechos, e buscar a cada repetição travava a TV.
+  var seekTarget = null;
+  var seekTimer = 0;
+  var seekHeld = 0;
+  var seekLastKey = 0;
+  var osdTick = 0;
+
+  function seekStep(dir, fast) {
+    var now = Date.now();
+    seekHeld = now - seekLastKey < 400 ? seekHeld + 1 : 0;
+    seekLastKey = now;
+    var step = fast ? SEEK_STEP * 3 : seekHeld < 3 ? SEEK_STEP : seekHeld < 12 ? SEEK_STEP * 3 : SEEK_STEP * 6;
+    return seek(dir * step);
+  }
+
   function seek(seconds) {
     var v = activeVideo();
     if (!v || !isFinite(v.duration)) return false;
-    v.currentTime = Math.min(v.duration - 1, Math.max(0, v.currentTime + seconds));
+    var from = seekTarget !== null ? seekTarget : v.currentTime;
+    seekTarget = Math.min(Math.max(0, v.duration - 1), Math.max(0, from + seconds));
     showOsd();
+    clearTimeout(seekTimer);
+    seekTimer = setTimeout(applySeek, 450);
     return true;
+  }
+
+  function applySeek() {
+    var v = activeVideo();
+    if (v && seekTarget !== null) {
+      try { v.currentTime = seekTarget; } catch (err) { /* fica onde está */ }
+    }
+    seekTarget = null;
+    if (osd) showOsd();
   }
 
   document.addEventListener('play', function (e) {
@@ -2198,10 +2323,10 @@
     var typing = isTextInput(document.activeElement);
 
     if (maxVideo) {
-      if (k === KEY.LEFT) { seek(-SEEK_STEP); stop(e); return; }
-      if (k === KEY.RIGHT) { seek(SEEK_STEP); stop(e); return; }
+      if (k === KEY.LEFT) { seekStep(-1); stop(e); return; }
+      if (k === KEY.RIGHT) { seekStep(1); stop(e); return; }
       if (k === KEY.UP || k === KEY.DOWN) { showOsd(); stop(e); return; }
-      if (k === KEY.ENTER) { playPause(); stop(e); return; }
+      if (k === KEY.ENTER) { if (!e.repeat) playPause(); stop(e); return; }
     }
 
     switch (k) {
