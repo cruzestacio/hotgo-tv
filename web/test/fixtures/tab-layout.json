@@ -1,0 +1,165 @@
+{
+ "id": "tab",
+ "layouts": [
+  {
+   "id": "a",
+   "type": "category_layout",
+   "namePt": "Outro"
+  },
+  {
+   "id": "b",
+   "type": "scroll",
+   "namePt": "Inicio",
+   "categories": [
+    {
+     "id": "lay",
+     "type": "layout",
+     "categoryInfos": [
+      {
+       "languageCode": "pt",
+       "name": "Canais"
+      }
+     ],
+     "content": [
+      {
+       "id": "x",
+       "type": "layout",
+       "name": "ignorado"
+      }
+     ]
+    },
+    {
+     "id": "cat0",
+     "type": "vod",
+     "categoryInfos": [
+      {
+       "languageCode": "es",
+       "name": "ES Estreias"
+      },
+      {
+       "languageCode": "pt",
+       "name": "Estreias"
+      }
+     ],
+     "content": [
+      {
+       "id": "vod001",
+       "type": "vod",
+       "name": "Vídeo 1",
+       "image": "https://img.example/thumb-1.jpg",
+       "backgroundImage": "https://img.example/thumb-1.jpg",
+       "duration": 1800,
+       "drm": false
+      },
+      {
+       "id": "vod002",
+       "type": "vod",
+       "name": "Vídeo 2",
+       "image": "https://img.example/thumb-2.jpg",
+       "backgroundImage": "https://img.example/thumb-2.jpg",
+       "duration": 1800,
+       "drm": false
+      },
+      {
+       "id": "vod003",
+       "type": "vod",
+       "name": "Vídeo 3",
+       "image": "https://img.example/thumb-3.jpg",
+       "backgroundImage": "https://img.example/thumb-3.jpg",
+       "duration": 1800,
+       "drm": false
+      },
+      {
+       "id": "vod004",
+       "type": "vod",
+       "name": "Vídeo 4",
+       "image": "https://img.example/thumb-4.jpg",
+       "backgroundImage": "https://img.example/thumb-4.jpg",
+       "duration": 1800,
+       "drm": false
+      },
+      {
+       "id": "vod005",
+       "type": "vod",
+       "name": "Vídeo 5",
+       "image": "https://img.example/thumb-5.jpg",
+       "backgroundImage": "https://img.example/thumb-5.jpg",
+       "duration": 1800,
+       "drm": false
+      },
+      {
+       "id": "vod006",
+       "type": "vod",
+       "name": "Vídeo 6",
+       "image": "https://img.example/thumb-6.jpg",
+       "backgroundImage": "https://img.example/thumb-6.jpg",
+       "duration": 1800,
+       "drm": false
+      }
+     ]
+    },
+    {
+     "id": "cat1",
+     "type": "vod",
+     "categoryInfos": [
+      {
+       "languageCode": "es",
+       "name": "ES Mais vistos"
+      },
+      {
+       "languageCode": "pt",
+       "name": "Mais vistos"
+      }
+     ],
+     "content": [
+      {
+       "id": "vod011",
+       "type": "vod",
+       "name": "Vídeo 11",
+       "image": "https://img.example/thumb-11.jpg",
+       "backgroundImage": "https://img.example/thumb-11.jpg",
+       "duration": 1800,
+       "drm": false
+      },
+      {
+       "id": "vod012",
+       "type": "vod",
+       "name": "Vídeo 12",
+       "image": "https://img.example/thumb-12.jpg",
+       "backgroundImage": "https://img.example/thumb-12.jpg",
+       "duration": 1800,
+       "drm": false
+      },
+      {
+       "id": "vod013",
+       "type": "vod",
+       "name": "Vídeo 13",
+       "image": "https://img.example/thumb-13.jpg",
+       "backgroundImage": "https://img.example/thumb-13.jpg",
+       "duration": 1800,
+       "drm": false
+      },
+      {
+       "id": "vod014",
+       "type": "vod",
+       "name": "Vídeo 14",
+       "image": "https://img.example/thumb-14.jpg",
+       "backgroundImage": "https://img.example/thumb-14.jpg",
+       "duration": 1800,
+       "drm": false
+      },
+      {
+       "id": "vod015",
+       "type": "vod",
+       "name": "Vídeo 15",
+       "image": "https://img.example/thumb-15.jpg",
+       "backgroundImage": "https://img.example/thumb-15.jpg",
+       "duration": 1800,
+       "drm": false
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

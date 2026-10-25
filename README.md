@@ -4,7 +4,9 @@ Apps de TV para assistir ao HotGo com o controle remoto, numa interface estilo N
 Uso pessoal, com a sua própria assinatura.
 
 Os apps são uma "casca": abrem o site oficial `hotgo.tv` e injetam por cima uma interface de TV.
-O login, o catálogo, o player e o DRM continuam sendo os do próprio HotGo.
+O login continua sendo o do próprio site. A tela Início usa o catálogo da API do HotGo (plataforma Streann)
+e os vídeos (HLS, sem DRM) tocam num player próprio em tela cheia; se a TV não tocar HLS, o app abre o
+player do site. As notas da API estão em [`docs/api.md`](docs/api.md).
 
 | Pasta | O que é |
 | --- | --- |

@@ -3,7 +3,10 @@
  *
  * Injetado na página do hotgo.tv pelos apps de TV (Fire TV e TizenBrew).
  * - Navegação espacial pelas setas do controle remoto.
- * - Tela "Início" estilo Netflix montada a partir dos cards que o site mostra.
+ * - Tela "Início" estilo Netflix montada com o catálogo da API do HotGo (plataforma
+ *   Streann). Fora do hotgo.tv, ou se a API falhar, usa os cards que a página mostra.
+ * - Toca os vídeos (HLS, sem DRM) num player próprio em tela cheia; sem suporte a HLS,
+ *   abre o player do próprio site.
  * - Vídeo em tela cheia com controles simples (play/pause, avançar/voltar).
  *
  * Escrito em JavaScript compatível com Chromium 56 (Tizen 4 / TVs Samsung 2018+):
@@ -17,6 +20,14 @@
   var SEEK_STEP = 10;
   var OSD_TIMEOUT = 3000;
   var MIN_CARDS_FOR_HOME = 6;
+
+  // Configuração pública que o próprio site do HotGo usa (main-es2015.*.js)
+  var API = {
+    base: 'https://cf.streann.tech',
+    reseller: '6361cf81e4b00c6a81f8f316',
+    publicToken: 'MwR78kBCrcvqeyaNTbjH13Z5LMDs45Hty',
+    appName: 'hotgo'
+  };
 
   var KEY = {
     LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, ENTER: 13,
@@ -40,6 +51,9 @@
   var maxVideo = null;
   var osd = null;
   var osdTimer = 0;
+  var catalog = null;
+  var catalogLoading = false;
+  var player = null;
 
   // ---------------------------------------------------------------- estilos
 
@@ -77,6 +91,7 @@
     'video.' + PREFIX + '-max{position:fixed !important;left:0 !important;top:0 !important;',
     '  width:100vw !important;height:100vh !important;max-width:none !important;max-height:none !important;',
     '  z-index:2147483645 !important;background:#000 !important;object-fit:contain !important;transform:none !important}',
+    '#' + PREFIX + '-player{display:none;background:#000}',
     '#' + PREFIX + '-osd{position:fixed;left:0;right:0;bottom:0;z-index:2147483646;padding:4vh 4vw;',
     '  background:linear-gradient(transparent,rgba(0,0,0,.9));color:#fff;font-family:Roboto,Arial,sans-serif;',
     '  font-size:1.4vw;opacity:0;transition:opacity .25s;pointer-events:none}',
@@ -263,6 +278,213 @@
     current.click();
   }
 
+
+  // ------------------------------------------------- API do HotGo (Streann)
+
+  function onHotgo() {
+    return /(^|\.)hotgo\.tv$/.test(window.location.hostname) || !!window.hotgoTVForceApi;
+  }
+
+  function store(key) {
+    try { return window.localStorage.getItem(key); } catch (err) { return null; }
+  }
+
+  function accessToken() {
+    var t = store('access_token');
+    return t && t !== 'null' && t !== 'undefined' ? t : null;
+  }
+
+  function lang() {
+    return store('langCode') || 'pt';
+  }
+
+  function country() {
+    var c = store('countryCode');
+    if (!c) {
+      var m = document.cookie.match(/(?:^|; )countryCode=([^;]+)/);
+      c = m ? decodeURIComponent(m[1]) : 'br';
+    }
+    return c.toLowerCase();
+  }
+
+  // O site gera um id aleatório por aparelho e manda em toda reprodução
+  function deviceId() {
+    var d = store('device');
+    if (!d || d === 'null') {
+      d = 'tv' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      try { window.localStorage.setItem('device', d); } catch (err) { /* sem storage */ }
+    }
+    return d;
+  }
+
+  function query(params) {
+    var out = [];
+    for (var k in params) {
+      if (params[k] !== undefined && params[k] !== null) {
+        out.push(encodeURIComponent(k) + '=' + encodeURIComponent(params[k]));
+      }
+    }
+    return out.join('&');
+  }
+
+  function api(method, path, params, body) {
+    var token = accessToken();
+    params = params || {};
+    params.r = API.reseller;
+    var headers = {
+      'Authorization': token ? 'Bearer ' + token : API.publicToken,
+      'x-app-name': API.appName,
+      'x-app-platform': 'web',
+      'x-langCode': lang()
+    };
+    if (body) headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    return fetch(API.base + path + '?' + query(params), {
+      method: method,
+      headers: headers,
+      body: body ? query(body) : undefined
+    }).then(function (res) {
+      if (!res.ok) {
+        var err = new Error('HTTP ' + res.status + ' em ' + path);
+        err.status = res.status;
+        throw err;
+      }
+      return res.json();
+    });
+  }
+
+  function nameFor(infos, fallback) {
+    var l = lang();
+    var best = null;
+    for (var i = 0; infos && i < infos.length; i++) {
+      var n = (infos[i].name || '').trim();
+      if (infos[i].languageCode === l && n) return n;
+      if (!best && n) best = n;
+    }
+    return best || fallback || '';
+  }
+
+  function toItem(v) {
+    if (!v || !v.id || !v.image) return null;
+    if (v.type && v.type !== 'vod' && v.type !== 'channel') return null;
+    return {
+      id: v.id,
+      type: v.type || 'vod',
+      title: v.name || '',
+      img: v.image,
+      backdrop: v.backgroundImage || v.image,
+      duration: v.duration || 0
+    };
+  }
+
+  // A home do site é o layout "scroll" do tab-layout: cada categoria vira uma linha
+  function parseLayout(data) {
+    var layouts = (data && data.layouts) || [];
+    var main = null;
+    for (var i = 0; i < layouts.length; i++) {
+      if (layouts[i].type === 'scroll' && layouts[i].categories && layouts[i].categories.length) {
+        main = layouts[i];
+        break;
+      }
+    }
+    if (!main) return null;
+    var rows = [];
+    main.categories.forEach(function (c) {
+      // categorias "layout" são atalhos para as abas das marcas, não vídeos
+      if (c.type === 'layout') return;
+      var items = [];
+      (c.content || []).forEach(function (v) {
+        var it = toItem(v);
+        if (it) items.push(it);
+      });
+      if (items.length) rows.push({ title: nameFor(c.categoryInfos, 'Mais vídeos'), items: items });
+    });
+    return rows.length ? rows : null;
+  }
+
+  function loadCatalog(done) {
+    if (!onHotgo() || catalogLoading) return;
+    catalogLoading = true;
+    var path = accessToken() ? '/web/services/v3/user/tab-layout' : '/web/services/v3/external/tab-layout';
+    api('GET', path, { dt: 'web', ln: lang(), cc: country() }).then(function (data) {
+      catalogLoading = false;
+      catalog = parseLayout(data);
+      if (done) done(catalog);
+    }, function (err) {
+      catalogLoading = false;
+      if (window.console) console.warn('[hotgoTV] catálogo indisponível:', err.message);
+      if (done) done(null);
+    });
+  }
+
+  function sitePlayer(item) {
+    window.location.href = window.location.origin + '/' + lang() + '/player/' + item.type + '/' + item.id;
+  }
+
+  function canPlayHls() {
+    var v = document.createElement('video');
+    return !!(v.canPlayType('application/vnd.apple.mpegurl') || v.canPlayType('application/x-mpegURL'));
+  }
+
+  function openItem(item) {
+    closeHome();
+    if (!accessToken()) {
+      window.location.href = window.location.origin + '/' + lang() + '/login';
+      return;
+    }
+    if (!canPlayHls()) { sitePlayer(item); return; }
+    var dataType = item.type === 'vod' ? 'videoondemand' : item.type;
+    api('POST', '/web/services/user-v2/check-access', { isFromTabLayout: true }, {
+      dataId: item.id, dataType: dataType, 'device-id': deviceId()
+    }).then(function (access) {
+      if (access && access.hasAccess === false) throw new Error('sem acesso a este vídeo');
+      return api('GET', '/loadbalancer/services/v1/' + item.type + 's-secure/' + item.id + '/playlist.m3u8', {
+        access_token: accessToken(),
+        'device-id': deviceId(),
+        'device-type': 'web',
+        'device-name': 'web',
+        withCredentials: 'false',
+        doNotUseRedirect: 'true',
+        country_code: country().toUpperCase()
+      });
+    }).then(function (res) {
+      if (!res || !res.url) throw new Error('playlist sem url');
+      playUrl(res.url, item.title);
+    }).catch(function (err) {
+      if (window.console) console.warn('[hotgoTV] player próprio falhou, usando o do site:', err.message);
+      if (err.status === 401) {
+        window.location.href = window.location.origin + '/' + lang() + '/login';
+        return;
+      }
+      sitePlayer(item);
+    });
+  }
+
+  function playUrl(url, title) {
+    if (!player) {
+      player = document.createElement('video');
+      player.id = PREFIX + '-player';
+      player.setAttribute('playsinline', '');
+      player.addEventListener('error', function () {
+        if (window.console) console.warn('[hotgoTV] erro no vídeo', player.error && player.error.code);
+      });
+      document.body.appendChild(player);
+    }
+    player.title = title || '';
+    player.src = url;
+    player.style.display = 'block';
+    maximize(player);
+    var p = player.play();
+    if (p && p.catch) p.catch(function () {});
+  }
+
+  function stopPlayer() {
+    if (!player) return;
+    player.pause();
+    player.removeAttribute('src');
+    try { player.load(); } catch (err) { /* nada a liberar */ }
+    player.style.display = 'none';
+  }
+
   // ------------------------------------------------------- tela Início
 
   function imageOf(card) {
@@ -335,13 +557,16 @@
   }
 
   function openCard(card) {
+    if (!card.link) { openItem(card); return; }
     closeHome();
     if (document.contains(card.link)) card.link.click();
     else window.location.href = card.href;
   }
 
   function buildHome() {
-    var cards = collectCards();
+    var rows = catalog;
+    var cards = rows ? [] : collectCards();
+    if (rows) rows.forEach(function (r) { r.items.forEach(function (it) { it.group = r.title; cards.push(it); }); });
     if (!home) {
       home = el('div');
       home.id = PREFIX + '-home';
@@ -357,7 +582,10 @@
     var btnSite = el('button', PREFIX + '-btn', 'Site completo');
     btnSite.onclick = function () { closeHome(); firstFocus(); };
     var btnReload = el('button', PREFIX + '-btn', 'Atualizar');
-    btnReload.onclick = function () { buildHome(); openHome(); };
+    btnReload.onclick = function () {
+      if (onHotgo()) loadCatalog(function () { buildHome(); openHome(); });
+      else { buildHome(); openHome(); }
+    };
     bar.appendChild(btnSite);
     bar.appendChild(btnReload);
     home.appendChild(bar);
@@ -376,7 +604,7 @@
     }
 
     var hero = el('div', PREFIX + '-hero');
-    hero.style.backgroundImage = 'url("' + cards[0].img.replace(/"/g, '%22') + '")';
+    hero.style.backgroundImage = 'url("' + (cards[0].backdrop || cards[0].img).replace(/"/g, '%22') + '")';
     var heroInfo = el('div', PREFIX + '-hero-info');
     heroInfo.appendChild(el('h1', PREFIX + '-hero-title', cards[0].title));
     var play = el('button', PREFIX + '-btn primary', '▶ Assistir');
@@ -542,7 +770,12 @@
     if (maxVideo) {
       var v = maxVideo;
       restore();
-      v.pause();
+      if (v === player) {
+        stopPlayer();
+        if (catalog) { buildHome(); openHome(); }
+      } else {
+        v.pause();
+      }
       return true;
     }
     if (homeOpen) { closeHome(); firstFocus(); return true; }
@@ -600,8 +833,10 @@
     autoTimer = setTimeout(function () {
       var path = window.location.pathname;
       if (homeOpen || maxVideo || homeShownFor[path]) return;
-      if (/login|entrar|signin|cadastro|checkout|assin/i.test(path)) return;
-      if (collectCards().length < MIN_CARDS_FOR_HOME) return;
+      if (/login|entrar|signin|cadastro|checkout|assin|player|select-profile/i.test(path)) return;
+      // com o catálogo da API, o Início só abre sozinho na página inicial do site
+      if (catalog && !/^\/([a-z]{2}\/?)?(home|main|browse)?\/?$/.test(path)) return;
+      if (!catalog && collectCards().length < MIN_CARDS_FOR_HOME) return;
       homeShownFor[path] = true;
       buildHome();
       openHome();
@@ -617,12 +852,15 @@
         if (!home || !home.contains(muts[i].target)) { maybeAutoHome(); return; }
       }
     }).observe(document.body, { childList: true, subtree: true });
+    loadCatalog(function () { maybeAutoHome(); });
     maybeAutoHome();
     setTimeout(function () { if (!current) firstFocus(); }, 800);
   }
 
   window.hotgoTV = {
-    version: '0.1.0',
+    version: '0.2.0',
+    openItem: openItem,
+    reloadCatalog: loadCatalog,
     toggleHome: toggleHome,
     back: back,
     playPause: playPause,

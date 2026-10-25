@@ -21,7 +21,8 @@ import android.widget.Toast
 
 /**
  * Casca do HotGo para Fire TV: abre o site oficial numa WebView em tela cheia e
- * injeta o overlay de TV (assets/tv-overlay.js). Login, player e DRM são os do site.
+ * injeta o overlay de TV (assets/tv-overlay.js). O login é o do site; o overlay monta o
+ * catálogo pela API e toca os vídeos (HLS) num <video> próprio.
  */
 class MainActivity : Activity() {
 
