@@ -917,10 +917,13 @@
     if (!accessToken()) { openCodeLogin(); return; }
     if (!window.HotGoNative && !canPlayHls()) { sitePlayer(item); return; }
     var dataType = item.type === 'vod' ? 'videoondemand' : item.type;
+    var denied = false;
     api('POST', '/web/services/user-v2/check-access', { isFromTabLayout: true }, {
       dataId: item.id, dataType: dataType, 'device-id': deviceId()
     }).then(function (access) {
-      if (access && access.hasAccess === false) throw new Error('sem acesso a este vídeo');
+      // o check-access às vezes nega e o playlist libera mesmo assim: quem decide é o playlist
+      denied = !!(access && access.hasAccess === false);
+      if (denied && window.console) console.warn('[hotgoTV] check-access negou:', JSON.stringify(access).slice(0, 400));
       return api('GET', '/loadbalancer/services/v1/' + item.type + 's-secure/' + item.id + '/playlist.m3u8', {
         access_token: accessToken(),
         'device-id': deviceId(),
@@ -934,9 +937,16 @@
       if (!res || !res.url) throw new Error('playlist sem url');
       playUrl(res.url, item.title, start);
     }).catch(function (err) {
-      if (window.console) console.warn('[hotgoTV] player próprio falhou, usando o do site:', err.message);
+      if (window.console) console.warn('[hotgoTV] player próprio falhou:', err.message, err.status || '');
       if (err.status === 401) {
         window.location.href = window.location.origin + '/' + lang() + '/login';
+        return;
+      }
+      // no modo app o site fica escondido (e o player dele quebra sem o <video>): avisa e fica no Início
+      if (appMode()) {
+        if (!homeOpen) { buildHome(); openHome(); }
+        toast(denied || err.status === 403 ? 'Este vídeo não está liberado na sua assinatura'
+          : 'Não consegui abrir este vídeo. Tente de novo.');
         return;
       }
       sitePlayer(item);
@@ -1975,7 +1985,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.11.1',
+    version: '0.11.2',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,

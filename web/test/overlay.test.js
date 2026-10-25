@@ -306,6 +306,7 @@ async function slowCatalogScenario(browser) {
   await page.addInitScript(() => {
     localStorage.setItem('access_token', 'token-de-teste');
     localStorage.setItem('langCode', 'es');
+    HTMLMediaElement.prototype.canPlayType = () => 'maybe';
   });
   await page.goto('https://www.hotgo.tv/pt/home');
   await page.addScriptTag({ content: OVERLAY });
@@ -319,6 +320,13 @@ async function slowCatalogScenario(browser) {
   await page.reload();
   await page.addScriptTag({ content: OVERLAY });
   await page.waitForSelector('#tvf-home.open .tvf-row-title', { timeout: 1000 });
+  // check-access nega e o playlist recusa: no modo app fica no Início com um aviso (o player do site quebra)
+  await page.route('https://cf.streann.tech/**/check-access**', (r) => r.fulfill({ headers: cors(), json: { hasAccess: false } }));
+  await page.route('https://cf.streann.tech/**/playlist.m3u8**', (r) => r.fulfill({ status: 403, headers: cors(), body: '{}' }));
+  await press(page, 'Enter');
+  await page.waitForFunction(() => /assinatura/.test((document.getElementById('tvf-toast') || {}).textContent || ''), null, { timeout: 3000 });
+  assert.match(page.url(), /\/pt\/home$/);
+  assert.strictEqual(await page.$eval('#tvf-home', (h) => h.classList.contains('open')), true);
   assert.deepStrictEqual(errors, []);
   await page.close();
   console.log('ok: catálogo lento');
