@@ -117,7 +117,16 @@ async function codeLoginScenario(browser) {
   await page.addInitScript(() => { window.hotgoTVPollEvery = 200; });
   await page.goto('https://www.hotgo.tv/pt/home');
   await page.addScriptTag({ content: OVERLAY });
-  await page.waitForSelector('#tvf-login.open', { timeout: 3000 });
+  const logs = [];
+  page.on('console', (m) => logs.push(m.type() + ': ' + m.text()));
+  try {
+    await page.waitForSelector('#tvf-login.open', { timeout: 5000 });
+  } catch (e) {
+    console.error('login não abriu. erros:', errors, 'console:', logs,
+      'estado:', await page.evaluate(() => ({ v: window.hotgoTV && window.hotgoTV.version, host: location.hostname,
+        tok: localStorage.getItem('access_token'), el: !!document.getElementById('tvf-login') })));
+    throw e;
+  }
   await page.waitForFunction(() => document.getElementById('tvf-code').textContent === '123456', null, { timeout: 3000 });
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'login-code.png') });
   await page.waitForFunction(() => localStorage.getItem('access_token') === 'tok-codigo', null, { timeout: 15000 });
