@@ -75,7 +75,9 @@
     '#' + PREFIX + '-home{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2147483640;',
     '  background:#0b0b0f;color:#fff;overflow:hidden;font-family:Roboto,Arial,sans-serif;display:none}',
     '#' + PREFIX + '-home.open{display:block}',
-    '#' + PREFIX + '-scroll{position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden}',
+    // a rolagem é por transform (camada da GPU): scrollTop/scrollLeft repintavam a tela toda no Fire TV
+    '#' + PREFIX + '-scroll{position:absolute;left:0;top:0;right:0;will-change:transform;',
+    '  transition:transform .15s ease-out}',
     '.' + PREFIX + '-hero{position:relative;height:52vh;background:#000 center/cover no-repeat}',
     '.' + PREFIX + '-hero:after{content:"";position:absolute;left:0;right:0;bottom:0;height:60%;',
     '  background:linear-gradient(transparent,#0b0b0f)}',
@@ -90,11 +92,16 @@
     '.' + PREFIX + '-btn.primary{background:#fff;color:#000}',
     '.' + PREFIX + '-row{margin:0 0 3.5vh}',
     '.' + PREFIX + '-row-title{font-size:1.6vw;font-weight:700;margin:0 4vw 1.4vh}',
-    '.' + PREFIX + '-track{position:relative;display:flex;overflow:hidden;padding:1.2vh 4vw;white-space:nowrap}',
-    '.' + PREFIX + '-card{flex:0 0 auto;width:18vw;margin-right:1vw;border-radius:6px;overflow:hidden;',
-    '  background:#1c1c24}',
-    // foco do card só com contorno: zoom repintava a linha toda no Fire TV Stick
-    '.' + PREFIX + '-card.' + PREFIX + '-focus{outline-width:6px !important;z-index:2}',
+    '.' + PREFIX + '-track{position:relative;overflow:hidden;padding:1.2vh 0}',
+    '.' + PREFIX + '-rail{display:flex;padding:0 4vw;white-space:nowrap;will-change:transform;',
+    '  transition:transform .15s ease-out}',
+    '.' + PREFIX + '-card{position:relative;flex:0 0 auto;width:18vw;margin-right:1vw;border-radius:6px;overflow:hidden;',
+    '  background:#1c1c24;opacity:.55}',
+    // card focado: moldura branca por dentro (o contorno por fora era cortado pela linha) e título em destaque
+    '.' + PREFIX + '-card.' + PREFIX + '-focus{outline:none !important;opacity:1;z-index:2}',
+    '.' + PREFIX + '-card.' + PREFIX + '-focus:after{content:"";position:absolute;left:0;top:0;right:0;bottom:0;',
+    '  border:.35vw solid #fff;border-radius:6px;pointer-events:none}',
+    '.' + PREFIX + '-card.' + PREFIX + '-focus .' + PREFIX + '-card-title{background:#ff2d55;color:#fff;font-weight:700}',
     '.' + PREFIX + '-thumb{width:100%;padding-top:56.25%;background:#222 center/cover no-repeat}',
     '.' + PREFIX + '-card-title{font-size:1vw;padding:.8vh .8vw;overflow:hidden;text-overflow:ellipsis;',
     '  white-space:nowrap;color:#ddd}',
@@ -244,7 +251,13 @@
     if (!e.hasAttribute('tabindex') && !/^(A|BUTTON|INPUT|SELECT|TEXTAREA)$/.test(e.tagName)) {
       e.setAttribute('tabindex', '-1');
     }
-    if (isTextInput(e)) {
+    if (home && home.contains(e)) {
+      // no Início as teclas já vêm para nós; focar de verdade faria o Chromium 56 (sem preventScroll)
+      // rolar a tela por conta própria, brigando com scrollHome
+      if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur) {
+        document.activeElement.blur();
+      }
+    } else if (isTextInput(e)) {
       // só destaca: focar o campo abriria o teclado virtual da TV; OK é que entra na edição
       if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     } else {
@@ -475,10 +488,23 @@
   function loadCatalog(done) {
     if (!onHotgo() || catalogLoading) return;
     catalogLoading = true;
-    var path = accessToken() ? '/web/services/v3/user/tab-layout' : '/web/services/v3/external/tab-layout';
-    api('GET', path, { dt: 'web', ln: lang(), cc: country() }).then(function (data) {
+    var params = { dt: 'web', ln: lang(), cc: country() };
+    var external = function () {
+      return api('GET', '/web/services/v3/external/tab-layout', params).then(parseLayout);
+    };
+    // logado, o layout do usuário às vezes falha ou vem sem a home: aí vale o catálogo público,
+    // que tem as mesmas linhas (antes caía na raspagem da página, com logos no lugar das capas)
+    var first = accessToken()
+      ? api('GET', '/web/services/v3/user/tab-layout', params).then(parseLayout).then(function (rows) {
+          return rows || external();
+        }, function (err) {
+          if (window.console) console.warn('[hotgoTV] layout do usuário falhou:', err.message);
+          return external();
+        })
+      : external();
+    first.then(function (rows) {
       catalogLoading = false;
-      catalog = parseLayout(data);
+      catalog = rows;
       if (done) done(catalog);
     }, function (err) {
       catalogLoading = false;
@@ -775,7 +801,8 @@
 
   function buildHome() {
     var rows = catalog;
-    var cards = rows ? [] : collectCards();
+    // no hotgo.tv a raspagem da página pega logos e capas ainda não carregadas: só vale fora dele
+    var cards = rows || onHotgo() ? [] : collectCards();
     if (rows) rows.forEach(function (r) { r.items.forEach(function (it) { it.group = r.title; cards.push(it); }); });
     if (!home) {
       home = el('div');
@@ -807,8 +834,13 @@
     if (!cards.length) {
       var empty = el('div', PREFIX + '-hero');
       var info = el('div', PREFIX + '-hero-info');
-      info.appendChild(el('h1', PREFIX + '-hero-title', 'Nenhum vídeo encontrado nesta página'));
-      info.appendChild(el('p', null, 'Use "Site completo" para navegar pelo site e abra o Início de novo.'));
+      if (onHotgo()) {
+        info.appendChild(el('h1', PREFIX + '-hero-title', 'Não consegui carregar o catálogo'));
+        info.appendChild(el('p', null, 'Aperte "Atualizar" para tentar de novo.'));
+      } else {
+        info.appendChild(el('h1', PREFIX + '-hero-title', 'Nenhum vídeo encontrado nesta página'));
+        info.appendChild(el('p', null, 'Use "Site completo" para navegar pelo site e abra o Início de novo.'));
+      }
       empty.appendChild(info);
       scroll.appendChild(empty);
       indexGrid();
@@ -836,6 +868,8 @@
       var row = el('section', PREFIX + '-row');
       row.appendChild(el('h2', PREFIX + '-row-title', name));
       var track = el('div', PREFIX + '-track');
+      var rail = el('div', PREFIX + '-rail');
+      track.appendChild(rail);
       var gridRow = [];
       homeGrid.push(gridRow);
       groups[name].forEach(function (c) {
@@ -849,7 +883,7 @@
         card.appendChild(thumb);
         card.appendChild(el('div', PREFIX + '-card-title', c.title));
         card.onclick = function () { openCard(c); };
-        track.appendChild(card);
+        rail.appendChild(card);
       });
       row.appendChild(track);
       scroll.appendChild(row);
@@ -897,15 +931,25 @@
     var bar = home.querySelector('.' + PREFIX + '-bar');
     if (!scroll) return;
     var row = closest(e, '.' + PREFIX + '-row');
-    scroll.scrollTop = row ? Math.max(0, row.offsetTop - window.innerHeight * 0.3) : 0;
-    if (bar) bar.classList.toggle('solid', scroll.scrollTop > 0);
-    var track = closest(e, '.' + PREFIX + '-track');
-    if (!track) return;
+    var y = row ? Math.max(0, row.offsetTop - window.innerHeight * 0.3) : 0;
+    if (scroll.tvfY !== y) {
+      scroll.tvfY = y;
+      scroll.style.transform = 'translate3d(0,' + (-y) + 'px,0)';
+      if (bar) bar.classList.toggle('solid', y > 0);
+    }
+    var rail = e.parentNode;
+    if (!rail || !rail.classList.contains(PREFIX + '-rail')) return;
     var pad = window.innerWidth * 0.04;
-    var left = e.offsetLeft - track.scrollLeft;
+    var x = rail.tvfX || 0;
+    var left = e.offsetLeft - x;
     var right = left + e.offsetWidth;
-    if (right > track.clientWidth - pad) track.scrollLeft += right - (track.clientWidth - pad);
-    else if (left < pad) track.scrollLeft = Math.max(0, e.offsetLeft - pad);
+    var width = rail.parentNode.clientWidth;
+    if (right > width - pad) x += right - (width - pad);
+    else if (left < pad) x = Math.max(0, e.offsetLeft - pad);
+    if (x !== (rail.tvfX || 0)) {
+      rail.tvfX = x;
+      rail.style.transform = 'translate3d(' + (-x) + 'px,0,0)';
+    }
   }
 
   // -------------------------------------------------------------- vídeo
@@ -1065,7 +1109,7 @@
       if (/login|entrar|signin|cadastro|checkout|assin|player|select-profile/i.test(path)) return;
       // com o catálogo da API, o Início só abre sozinho na página inicial do site
       if (catalog && !/^\/([a-z]{2}\/?)?(home|main|browse)?\/?$/.test(path)) return;
-      if (!catalog && collectCards().length < MIN_CARDS_FOR_HOME) return;
+      if (!catalog && (onHotgo() || collectCards().length < MIN_CARDS_FOR_HOME)) return;
       homeShownFor[path] = true;
       buildHome();
       openHome();
@@ -1091,7 +1135,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.5.0',
+    version: '0.5.1',
     openItem: openItem,
     codeLogin: openCodeLogin,
     reloadCatalog: loadCatalog,

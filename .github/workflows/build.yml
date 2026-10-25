@@ -21,6 +21,8 @@ jobs:
 
   firetv:
     runs-on: ubuntu-latest
+    env:
+      KEYSTORE_B64: ${{ secrets.HOTGO_KEYSTORE_B64 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -30,8 +32,15 @@ jobs:
       # O ubuntu-latest já vem com o Android SDK (ANDROID_HOME); o setup-android quebrava
       # tentando instalar o pacote 'tools', que não existe mais
       - uses: gradle/actions/setup-gradle@v4
+      - name: Keystore fixa (se configurada nos segredos)
+        if: env.KEYSTORE_B64 != ''
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/hotgo.jks"
+          echo "HOTGO_KEYSTORE=$RUNNER_TEMP/hotgo.jks" >> "$GITHUB_ENV"
       - name: Build APK
         working-directory: firetv
+        env:
+          HOTGO_KEYSTORE_PASSWORD: ${{ secrets.HOTGO_KEYSTORE_PASSWORD }}
         run: ./gradlew --no-daemon assembleRelease
       - run: cp firetv/app/build/outputs/apk/release/app-release.apk hotgo-tv-firetv.apk
       - uses: actions/upload-artifact@v4

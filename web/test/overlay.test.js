@@ -40,6 +40,8 @@ async function apiScenario(browser) {
     const u = new URL(req.url());
     if (req.method() === 'OPTIONS') return r.fulfill({ status: 204, headers: cors() });
     calls.push({ method: req.method(), path: u.pathname, auth: req.headers()['authorization'], body: req.postData() });
+    // o layout do usuário falhando: o Início tem que vir do catálogo público
+    if (u.pathname.endsWith('/user/tab-layout')) return r.fulfill({ status: 500, headers: cors(), body: '{}' });
     if (u.pathname.endsWith('/tab-layout')) return r.fulfill({ headers: cors(), path: fixture });
     if (u.pathname.endsWith('/check-access')) return r.fulfill({ headers: cors(), json: { hasAccess: true } });
     if (u.pathname.endsWith('/playlist.m3u8')) {
@@ -66,10 +68,21 @@ async function apiScenario(browser) {
   const layout = calls.find((c) => c.path.endsWith('/tab-layout'));
   assert.strictEqual(layout.path, '/web/services/v3/user/tab-layout');
   assert.strictEqual(layout.auth, 'Bearer token-de-teste');
+  assert.ok(calls.some((c) => c.path === '/web/services/v3/external/tab-layout'));
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'home-api.png') });
 
   await press(page, 'ArrowDown');
   const first = await focused(page);
+  // o card focado tem que se destacar dos outros
+  const look = await page.evaluate(() => {
+    const f = document.querySelector('.tvf-card.tvf-focus');
+    const other = document.querySelector('.tvf-card:not(.tvf-focus)');
+    return { f: !!f, title: f && getComputedStyle(f.querySelector('.tvf-card-title')).backgroundColor,
+      op: f && getComputedStyle(f).opacity, otherOp: other && getComputedStyle(other).opacity };
+  });
+  assert.ok(look.f, 'nenhum card focado');
+  assert.strictEqual(look.title, 'rgb(255, 45, 85)');
+  assert.ok(Number(look.op) > Number(look.otherOp));
   await press(page, 'Enter');
   await page.waitForFunction(() => {
     const v = document.getElementById('tvf-player');

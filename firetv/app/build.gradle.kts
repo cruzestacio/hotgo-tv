@@ -12,8 +12,8 @@ android {
         // Fire OS 5 (Fire TV Stick 2ª geração) é API 22; Fire OS 7/8 vêm acima disso
         minSdk = 22
         targetSdk = 34
-        versionCode = 6
-        versionName = "0.5.0"
+        versionCode = 7
+        versionName = "0.5.1"
         buildConfigField("String", "START_URL", "\"https://www.hotgo.tv/\"")
     }
 
@@ -24,11 +24,25 @@ android {
     // O overlay compartilhado (web/src/tv-overlay.js) entra como asset do APK
     sourceSets["main"].assets.srcDir("../../web/src")
 
+    // Chave fixa vinda dos segredos do GitHub (HOTGO_KEYSTORE_B64 e HOTGO_KEYSTORE_PASSWORD): com ela,
+    // cada versão instala por cima da anterior sem perder o login. Sem os segredos, usa a chave de debug,
+    // que muda a cada build do CI.
+    val keystorePath = System.getenv("HOTGO_KEYSTORE")
+    if (keystorePath != null) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("HOTGO_KEYSTORE_PASSWORD")
+                keyAlias = "hotgotv"
+                keyPassword = System.getenv("HOTGO_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // App de uso pessoal instalado por sideload: assina com a chave de debug
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
