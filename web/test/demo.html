@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catálogo simulado</title>
+<style>
+  body { margin: 0; font-family: Arial, sans-serif; background: #111; color: #eee; }
+  header { display: flex; gap: 16px; padding: 16px; background: #000; }
+  header a { color: #fff; }
+  .section { padding: 16px; }
+  .grid { display: flex; gap: 12px; flex-wrap: wrap; }
+  .card { display: block; width: 220px; color: #ccc; text-decoration: none; }
+  .card img { width: 220px; height: 124px; display: block; }
+  .fake-btn { display: inline-block; padding: 8px 16px; background: #333; cursor: pointer; }
+  #player { display: none; padding: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <a href="#/">Início</a>
+  <a href="#/ao-vivo">Ao vivo</a>
+  <div class="fake-btn" onclick="document.title='menu-clicado'">Menu</div>
+  <input type="search" placeholder="Buscar">
+</header>
+<main id="main"></main>
+<div id="player"><h1 id="player-title"></h1><video id="video" width="640" height="360" controls></video></div>
+<script>
+  function thumb(color, label) {
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180">' +
+      '<rect width="320" height="180" fill="' + color + '"/>' +
+      '<text x="160" y="100" font-size="28" text-anchor="middle" fill="#fff">' + label + '</text></svg>';
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+  var sections = [['Lançamentos', '#c0392b'], ['Mais assistidos', '#2980b9'], ['Canais', '#27ae60']];
+  var main = document.getElementById('main');
+  sections.forEach(function (s, si) {
+    var sec = document.createElement('section');
+    sec.className = 'section';
+    var h = document.createElement('h2');
+    h.textContent = s[0];
+    sec.appendChild(h);
+    var grid = document.createElement('div');
+    grid.className = 'grid';
+    for (var i = 1; i <= 6; i++) {
+      var a = document.createElement('a');
+      a.className = 'card';
+      a.href = '#/video/' + si + '-' + i;
+      var img = document.createElement('img');
+      img.src = thumb(s[1], s[0][0] + i);
+      img.alt = s[0] + ' ' + i;
+      a.appendChild(img);
+      var t = document.createElement('div');
+      t.textContent = s[0] + ' ' + i;
+      a.appendChild(t);
+      grid.appendChild(a);
+    }
+    sec.appendChild(grid);
+    main.appendChild(sec);
+  });
+  window.addEventListener('hashchange', function () {
+    var m = location.hash.match(/#\/video\/(.+)/);
+    document.getElementById('player').style.display = m ? 'block' : 'none';
+    main.style.display = m ? 'none' : 'block';
+    if (m) document.getElementById('player-title').textContent = 'Vídeo ' + m[1];
+  });
+</script>
+</body>
+</html>
