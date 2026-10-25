@@ -41,3 +41,14 @@ hotgo.tv, *.streann.tech, *.streann.com, streann.akamaized.net
   Categorias `type: "layout"` são atalhos para as abas das marcas (o overlay ignora por enquanto).
 - `categories[].content[]`: vídeos, com `id`, `type: "vod"`, `name`, `image`, `backgroundImage`, `duration`, `drm`.
   Na resposta de 2026-10-25, os 336 vídeos da home tinham `drm: false`.
+
+## App oficial de Android TV (com.claxson.hotgo.tv 1.0.60), lido em 2026-10-25
+- API base `https://api.streann.tech/web/` (mesmos caminhos do site), loadbalancer em `https://api.streann.tech/loadbalancer/`.
+- Headers: `x-app-platform: android-tv`, `x-device-id`, `x-app-name`, `x-app-version`, `x-langCode`.
+- **Login por código (sem digitar senha/PIN na TV):**
+  1. `GET services/public/login-code?resellerId=<r>` (sem auth) → `{"id","code","date"}`; a TV mostra o `code` e o QR para `hotgo.tv/tv`.
+  2. Polling `GET services/public/smartTv/login/code/{code}/reseller/{r}` com o header `Authorization` público do app.
+     Responde 200 vazio enquanto ninguém confirmou; depois devolve o Token (`access_token`, `refresh_token`).
+  3. O usuário entra em hotgo.tv/tv no celular, faz login e digita o código. O código expira em ~5 min.
+- CORS de api.streann.tech: `access-control-allow-origin: *`, então dá para usar no app web da Samsung.
+- Continuar assistindo: `https://continue-watching.services.c1.streann.com/v1/watch-progress/*`.
