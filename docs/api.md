@@ -52,3 +52,6 @@ hotgo.tv, *.streann.tech, *.streann.com, streann.akamaized.net
   3. O usuário entra em hotgo.tv/tv no celular, faz login e digita o código. O código expira em ~5 min.
 - CORS de api.streann.tech: `access-control-allow-origin: *`, então dá para usar no app web da Samsung.
 - Continuar assistindo: `https://continue-watching.services.c1.streann.com/v1/watch-progress/*`.
+- `tab-layout` depende do `dt`: `web` → "Web only _Brazil", `androidTv` → "Android TV" (8 abas), `fireTv` → vazio
+  (por isso o app oficial mostra "Indisponível para sua região" no Fire TV). Sem o header `Origin: https://www.hotgo.tv`,
+  a chamada pública responde 500 "unauthorized!".
