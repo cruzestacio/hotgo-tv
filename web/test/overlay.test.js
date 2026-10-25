@@ -280,6 +280,50 @@ async function codeLoginScenario(browser) {
   await page.close();
 }
 
+// Na TV o tab-layout leva ~10 s e às vezes falha: o Início fica em "Carregando…", tenta de novo
+// e, na próxima abertura, já nasce com a cópia guardada do catálogo.
+async function slowCatalogScenario(browser) {
+  const fixture = path.join(__dirname, 'fixtures', 'tab-layout.json');
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const errors = [];
+  let layouts = 0;
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.route('https://www.hotgo.tv/**', (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><body></body>' }));
+  await page.route('https://cf.streann.tech/**', async (r) => {
+    const req = r.request();
+    const u = new URL(req.url());
+    if (req.method() === 'OPTIONS') return r.fulfill({ status: 204, headers: cors() });
+    if (u.pathname.endsWith('/user/tab-layout')) return r.fulfill({ status: 500, headers: cors(), body: '{}' });
+    if (u.pathname.endsWith('/tab-layout')) {
+      layouts++;
+      // primeira tentativa falha, a segunda demora
+      if (layouts === 1) return r.fulfill({ status: 503, headers: cors(), body: '{}' });
+      await new Promise((ok) => setTimeout(ok, 1500));
+      return r.fulfill({ headers: cors(), path: fixture });
+    }
+    return r.fulfill({ status: 404, headers: cors(), body: '{}' });
+  });
+  await page.addInitScript(() => {
+    localStorage.setItem('access_token', 'token-de-teste');
+    localStorage.setItem('langCode', 'es');
+  });
+  await page.goto('https://www.hotgo.tv/pt/home');
+  await page.addScriptTag({ content: OVERLAY });
+  await page.waitForSelector('#tvf-home.open', { timeout: 5000 });
+  assert.strictEqual(await page.$eval('.tvf-hero-title', (h) => h.textContent), 'Carregando…');
+  await page.waitForSelector('.tvf-row-title', { timeout: 10000 });
+  assert.strictEqual(layouts, 2);
+  // a fixture tem nomes em pt e es: o app fica em português mesmo com o site em espanhol
+  assert.strictEqual(await page.$eval('.tvf-row-focus .tvf-row-title', (h) => h.textContent), 'Estreias');
+
+  await page.reload();
+  await page.addScriptTag({ content: OVERLAY });
+  await page.waitForSelector('#tvf-home.open .tvf-row-title', { timeout: 1000 });
+  assert.deepStrictEqual(errors, []);
+  await page.close();
+  console.log('ok: catálogo lento');
+}
+
 function cors() {
   return {
     'access-control-allow-origin': 'https://www.hotgo.tv',
@@ -345,6 +389,7 @@ function cors() {
 
   assert.deepStrictEqual(errors, []);
   await apiScenario(browser);
+  await slowCatalogScenario(browser);
   await codeLoginScenario(browser);
   await browser.close();
   console.log('ok: overlay passou em todos os cenários');

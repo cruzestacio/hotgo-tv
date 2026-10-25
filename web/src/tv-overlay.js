@@ -498,8 +498,9 @@
     try { return window.sessionStorage.getItem('access_token'); } catch (err) { return null; }
   }
 
+  // o app é em português: o site às vezes guarda "es" quando passa por /es
   function lang() {
-    return store('langCode') || 'pt';
+    return store('langCode') === 'en' ? 'en' : 'pt';
   }
 
   function country() {
@@ -649,8 +650,28 @@
     return out.sort(function (a, b) { return a.order - b.order; });
   }
 
-  function loadCatalog(done) {
-    if (!onHotgo() || catalogLoading) return;
+  // Guarda uma cópia enxuta do catálogo para o Início abrir na hora; a API leva ~10 s na TV
+  var CATALOG_CACHE = 'tvfCatalog';
+  function saveCatalog(rows) {
+    try {
+      var slim = rows.slice(0, 30).map(function (r) { return { title: r.title, items: r.items.slice(0, 24) }; });
+      window.localStorage.setItem(CATALOG_CACHE, JSON.stringify({ rows: slim, menu: rows.menu || [] }));
+    } catch (err) { /* sem espaço: segue sem cache */ }
+  }
+
+  function cachedCatalog() {
+    try {
+      var c = JSON.parse(store(CATALOG_CACHE) || 'null');
+      if (!c || !c.rows || !c.rows.length) return null;
+      c.rows.menu = c.menu || [];
+      return c.rows;
+    } catch (err) { return null; }
+  }
+
+  var CATALOG_RETRIES = [3000, 8000];
+  function loadCatalog(done, attempt) {
+    if (!onHotgo() || (catalogLoading && !attempt)) return;
+    attempt = attempt || 0;
     catalogLoading = true;
     var params = { dt: 'web', ln: lang(), cc: country() };
     var external = function () {
@@ -667,16 +688,24 @@
           return external();
         })
       : external();
+    var failed = function (why) {
+      if (window.console) console.warn('[hotgoTV] catálogo indisponível (tentativa ' + (attempt + 1) + '):', why);
+      // a rede da TV às vezes demora a acordar: tenta de novo antes de mostrar erro
+      if (attempt < CATALOG_RETRIES.length) {
+        setTimeout(function () { loadCatalog(done, attempt + 1); }, CATALOG_RETRIES[attempt]);
+        return;
+      }
+      catalogLoading = false;
+      if (done) done(catalog);
+    };
     first.then(function (rows) {
+      if (!rows) { failed('layout sem a home'); return; }
       catalogLoading = false;
       catalog = rows;
-      menu = (rows && rows.menu) || [];
+      menu = rows.menu || [];
+      saveCatalog(rows);
       if (done) done(catalog);
-    }, function (err) {
-      catalogLoading = false;
-      if (window.console) console.warn('[hotgoTV] catálogo indisponível:', err.message);
-      if (done) done(null);
-    });
+    }, function (err) { failed(err.message); });
   }
 
 
@@ -1794,7 +1823,11 @@
       restore();
       if (v === player) {
         stopPlayer();
-        if (catalog) { buildHome(); openHome(); }
+        if (catalog || appMode()) {
+          // sem catálogo ainda, o Início mostra "Carregando…" e se refaz quando ele chegar
+          if (!catalog && !catalogLoading) loadCatalog(catalogArrived);
+          buildHome(); openHome();
+        }
       } else {
         v.pause();
       }
@@ -1904,6 +1937,17 @@
     }, 1500);
   }
 
+  function catalogArrived() {
+    // o Início do modo app já estava aberto (com "Carregando…" ou com o cache): refaz com o catálogo novo
+    if (appMode() && homeOpen) {
+      if (page.key === 'home' && !maxVideo) {
+        // quem já navegava pelo cache continua no mesmo card; do "Carregando…" vai para a primeira linha
+        if (!page.r) page = { key: 'home' };
+        buildHome(); openHome();
+      }
+    } else maybeAutoHome();
+  }
+
   function init() {
     injectStyle();
     registerTizenKeys();
@@ -1914,11 +1958,13 @@
       }
     }).observe(document.body, { childList: true, subtree: true });
     updateCover();
+    if (onHotgo()) {
+      catalog = cachedCatalog();
+      menu = (catalog && catalog.menu) || [];
+    }
+    // começa a carregar antes de montar o Início, para ele já nascer com "Carregando…"
+    loadCatalog(catalogArrived);
     if (appMode()) { buildHome(); openHome(); }
-    loadCatalog(function () {
-      // o Início do modo app já estava aberto com "Carregando…": refaz com o catálogo
-      if (appMode() && homeOpen) { page = { key: 'home' }; buildHome(); openHome(); } else maybeAutoHome();
-    });
     // sem sessão, o app começa pelo login por código (a não ser que a pessoa tenha pedido e-mail e senha)
     var emailLogin = false;
     try { emailLogin = window.sessionStorage.getItem('tvfEmailLogin') === '1'; } catch (err) { emailLogin = false; }
@@ -1928,7 +1974,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.11.0',
+    version: '0.11.1',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,

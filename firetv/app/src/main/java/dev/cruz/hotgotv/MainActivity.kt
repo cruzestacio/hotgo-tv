@@ -5,6 +5,7 @@ import android.app.Activity
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -12,6 +13,7 @@ import android.view.WindowManager
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
+import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -95,6 +97,12 @@ class MainActivity : Activity() {
         }
 
         web.webChromeClient = object : WebChromeClient() {
+            // console do overlay no logcat (adb logcat -s hotgoTV) para investigar na TV
+            override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                Log.i("hotgoTV", "${message.message()} (${message.sourceId()}:${message.lineNumber()})")
+                return true
+            }
+
             override fun onPermissionRequest(request: PermissionRequest) {
                 // Widevine (DRM) na WebView precisa desta permissão
                 val drm = request.resources.filter { it == PermissionRequest.RESOURCE_PROTECTED_MEDIA_ID }
