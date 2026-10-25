@@ -2069,10 +2069,14 @@
     if (onHotgo() && !accessToken() && !emailLogin) setTimeout(openCodeLogin, 300);
     maybeAutoHome();
     setTimeout(function () { if (!current) firstFocus(); }, 800);
+    // no Fire TV, tira a tela de abertura nativa (o login por código abre em 300 ms)
+    setTimeout(function () {
+      try { if (window.HotGoNative && window.HotGoNative.ready) window.HotGoNative.ready(); } catch (err) { /* sem ponte */ }
+    }, 400);
   }
 
   window.hotgoTV = {
-    version: '0.11.5',
+    version: '0.12.0',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,

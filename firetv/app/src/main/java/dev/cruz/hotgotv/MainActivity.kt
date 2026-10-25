@@ -5,21 +5,28 @@ import android.app.Activity
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
-import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 
 /**
@@ -38,6 +45,9 @@ class MainActivity : Activity() {
     // Página atual, para a ponte nativa só atender o hotgo.tv (a ponte roda fora da thread da UI)
     @Volatile
     private var currentUrl: String? = null
+
+    private var splash: View? = null
+    private val handler = Handler(Looper.getMainLooper())
 
     private val overlayJs: String by lazy {
         assets.open("tv-overlay.js").bufferedReader().use { it.readText() }
@@ -58,6 +68,10 @@ class MainActivity : Activity() {
             isFocusableInTouchMode = true
         }
         root.addView(web, FrameLayout.LayoutParams(MATCH, MATCH))
+        // Tela de abertura própria: o site carrega por baixo e some quando o overlay avisa que está pronto
+        splash = buildSplash()
+        root.addView(splash, FrameLayout.LayoutParams(MATCH, MATCH))
+        handler.postDelayed(::hideSplash, SPLASH_MAX_MS)
         setContentView(root)
 
         with(web.settings) {
@@ -90,9 +104,22 @@ class MainActivity : Activity() {
                 return scheme != "http" && scheme != "https"
             }
 
+            // O overlay entra assim que a página aparece, sem esperar os ~15 s de scripts do site;
+            // ele mesmo ignora a segunda injeção (onPageFinished fica de reserva)
+            override fun onPageCommitVisible(view: WebView, url: String) {
+                view.evaluateJavascript(overlayJs, null)
+            }
+
             override fun onPageFinished(view: WebView, url: String) {
                 view.evaluateJavascript(overlayJs, null)
                 CookieManager.getInstance().flush()
+            }
+
+            // Rastreadores, anúncios e as capas gigantes do site (que fica escondido) só pesam na TV
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                if (!isBlocked(request.url)) return null
+                return WebResourceResponse("text/plain", "utf-8", 204, "No Content",
+                    mapOf("Access-Control-Allow-Origin" to "*"), "".byteInputStream())
             }
         }
 
@@ -196,11 +223,49 @@ class MainActivity : Activity() {
             return true
         }
 
+        /** O overlay montou o Início (ou o login): tira a tela de abertura. */
+        @JavascriptInterface
+        fun ready() {
+            runOnUiThread { hideSplash() }
+        }
+
         // Voltar duas vezes no Início do overlay fecha o app em vez de voltar pelo histórico do site
         @JavascriptInterface
         fun exit() {
             runOnUiThread { finish() }
         }
+    }
+
+    private fun buildSplash(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        setBackgroundColor(Color.rgb(15, 15, 15))
+        addView(TextView(context).apply {
+            text = "HOTGO"
+            setTextColor(Color.rgb(229, 9, 20))
+            textSize = 56f
+            paint.isFakeBoldText = true
+            letterSpacing = 0.08f
+        })
+        addView(ProgressBar(context).apply { isIndeterminate = true },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                .apply { topMargin = 48 })
+    }
+
+    private fun hideSplash() {
+        val view = splash ?: return
+        splash = null
+        view.animate().alpha(0f).setDuration(200).withEndAction { root.removeView(view) }.start()
+        web.requestFocus()
+    }
+
+    private fun isBlocked(url: Uri): Boolean {
+        val host = url.host ?: return false
+        if (BLOCKED_HOSTS.any { host == it || host.endsWith(".$it") }) return true
+        if (host == "www.gstatic.com" && url.path.orEmpty().startsWith("/cv/js/sender")) return true
+        if (host == "www.facebook.com" && url.path == "/tr") return true
+        // o overlay pede as capas já reduzidas (?width=); sem isso é o site carregando 1920 px por capa
+        return host == "img.streann.tech" && url.getQueryParameter("width") == null
     }
 
     private fun isHotgoHost(host: String) = host == "hotgo.tv" || host.endsWith(".hotgo.tv")
@@ -226,6 +291,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
         root.removeAllViews()
         web.destroy()
         super.onDestroy()
@@ -233,6 +299,13 @@ class MainActivity : Activity() {
 
     companion object {
         private const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
+        private const val SPLASH_MAX_MS = 25_000L
+
+        private val BLOCKED_HOSTS = listOf(
+            "doubleclick.net", "googletagmanager.com", "google-analytics.com", "connect.facebook.net",
+            "contentsquare.net", "hotjar.com", "sdk-web.y.uno", "kochava.com", "cookingmetrics.com",
+            "inside-ads.services.c1.streann.com", "ads.streann.tech"
+        )
 
         private val HANDLED_KEYS = setOf(
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_MENU,
