@@ -35,7 +35,8 @@ jobs:
       - name: Keystore fixa (se configurada nos segredos)
         if: env.KEYSTORE_B64 != ''
         run: |
-          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/hotgo.jks"
+          # aceita base64 gerado no Windows (quebras CRLF ou cabeçalhos do certutil)
+          printf '%s' "$KEYSTORE_B64" | tr -d '\r\n\t ' | sed 's/-----[A-Z]*-----//g' | base64 -d > "$RUNNER_TEMP/hotgo.jks"
           echo "HOTGO_KEYSTORE=$RUNNER_TEMP/hotgo.jks" >> "$GITHUB_ENV"
       - name: Build APK
         working-directory: firetv
