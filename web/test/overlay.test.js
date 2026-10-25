@@ -82,6 +82,17 @@ async function apiScenario(browser) {
   assert.match(src, /^https:\/\/cfvod\.example\/.+\/hls\/master\.m3u8$/);
   console.log('tocando', first, '->', src);
 
+  // No app do Fire TV, o vídeo vai para o player nativo pela ponte HotGoNative
+  await page.evaluate(() => {
+    window.nativeCalls = [];
+    window.HotGoNative = { play: (url, title) => { window.nativeCalls.push([url, title]); return true; } };
+  });
+  await page.evaluate(() => window.hotgoTV.openItem({ id: 'vod002', type: 'vod', title: 'Nativo' }));
+  await page.waitForFunction(() => window.nativeCalls.length === 1, null, { timeout: 3000 });
+  assert.deepStrictEqual(await page.evaluate(() => window.nativeCalls[0]),
+    ['https://cfvod.example/vod002/hls/master.m3u8', 'Nativo']);
+  await page.evaluate(() => { delete window.HotGoNative; });
+
   // Voltar fecha o player e reabre o Início
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 10009, bubbles: true })));
   await page.waitForTimeout(200);

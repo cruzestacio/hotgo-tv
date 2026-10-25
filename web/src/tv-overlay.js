@@ -93,7 +93,8 @@
     '.' + PREFIX + '-track{position:relative;display:flex;overflow:hidden;padding:1.2vh 4vw;white-space:nowrap}',
     '.' + PREFIX + '-card{flex:0 0 auto;width:18vw;margin-right:1vw;border-radius:6px;overflow:hidden;',
     '  background:#1c1c24}',
-    '.' + PREFIX + '-card.' + PREFIX + '-focus{transform:scale(1.08);z-index:2}',
+    // foco do card só com contorno: zoom repintava a linha toda no Fire TV Stick
+    '.' + PREFIX + '-card.' + PREFIX + '-focus{outline-width:6px !important;z-index:2}',
     '.' + PREFIX + '-thumb{width:100%;padding-top:56.25%;background:#222 center/cover no-repeat}',
     '.' + PREFIX + '-card-title{font-size:1vw;padding:.8vh .8vw;overflow:hidden;text-overflow:ellipsis;',
     '  white-space:nowrap;color:#ddd}',
@@ -623,7 +624,7 @@
   function openItem(item) {
     closeHome();
     if (!accessToken()) { openCodeLogin(); return; }
-    if (!canPlayHls()) { sitePlayer(item); return; }
+    if (!window.HotGoNative && !canPlayHls()) { sitePlayer(item); return; }
     var dataType = item.type === 'vod' ? 'videoondemand' : item.type;
     api('POST', '/web/services/user-v2/check-access', { isFromTabLayout: true }, {
       dataId: item.id, dataType: dataType, 'device-id': deviceId()
@@ -652,6 +653,12 @@
   }
 
   function playUrl(url, title) {
+    // No app do Fire TV, o vídeo vai para o player nativo (ExoPlayer)
+    if (window.HotGoNative && window.HotGoNative.play) {
+      try {
+        if (window.HotGoNative.play(url, title || '')) return;
+      } catch (err) { /* cai no <video> */ }
+    }
     if (!player) {
       player = document.createElement('video');
       player.id = PREFIX + '-player';
@@ -1084,7 +1091,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.4.1',
+    version: '0.5.0',
     openItem: openItem,
     codeLogin: openCodeLogin,
     reloadCatalog: loadCatalog,

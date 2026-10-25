@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">HotGo TV</string>
     <string name="press_back_again">Aperte Voltar de novo para sair</string>
+    <string name="player_error">Não deu para tocar o vídeo (%1$s)</string>
 </resources>

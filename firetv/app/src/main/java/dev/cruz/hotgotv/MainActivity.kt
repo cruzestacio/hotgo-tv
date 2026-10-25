@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -31,6 +32,10 @@ class MainActivity : Activity() {
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     private var lastBackPress = 0L
+
+    // Página atual, para a ponte nativa só atender o hotgo.tv (a ponte roda fora da thread da UI)
+    @Volatile
+    private var currentUrl: String? = null
 
     private val overlayJs: String by lazy {
         assets.open("tv-overlay.js").bufferedReader().use { it.readText() }
@@ -70,7 +75,13 @@ class MainActivity : Activity() {
             setAcceptThirdPartyCookies(web, true)
         }
 
+        web.addJavascriptInterface(NativeBridge(), "HotGoNative")
+
         web.webViewClient = object : WebViewClient() {
+            override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
+                currentUrl = url
+            }
+
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val scheme = request.url.scheme ?: return true
                 // Links fora de http(s) (intent:, whatsapp: etc.) não têm para onde ir na TV
@@ -109,7 +120,7 @@ class MainActivity : Activity() {
         if (savedInstanceState != null) {
             web.restoreState(savedInstanceState)
         } else {
-            web.loadUrl(intent?.data?.takeIf { it.host?.endsWith("hotgo.tv") == true }?.toString()
+            web.loadUrl(intent?.data?.takeIf { it.host?.let(::isHotgoHost) == true }?.toString()
                 ?: BuildConfig.START_URL)
         }
     }
@@ -160,6 +171,20 @@ class MainActivity : Activity() {
     }
 
     private fun js(code: String) = web.evaluateJavascript(code, null)
+
+    /** Chamado pelo overlay (window.HotGoNative) para tocar o HLS no player nativo. */
+    inner class NativeBridge {
+        @JavascriptInterface
+        fun play(url: String, title: String?): Boolean {
+            val page = currentUrl?.let(Uri::parse)?.host ?: return false
+            val video = Uri.parse(url)
+            if (!isHotgoHost(page) || video.scheme != "https") return false
+            runOnUiThread { PlayerActivity.start(this@MainActivity, url, title.orEmpty()) }
+            return true
+        }
+    }
+
+    private fun isHotgoHost(host: String) = host == "hotgo.tv" || host.endsWith(".hotgo.tv")
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
