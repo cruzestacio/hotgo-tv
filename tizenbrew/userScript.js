@@ -104,6 +104,9 @@
     '  width:100vw !important;height:100vh !important;max-width:none !important;max-height:none !important;',
     '  z-index:2147483645 !important;background:#000 !important;object-fit:contain !important;transform:none !important}',
     '#' + PREFIX + '-player{display:none;background:#000}',
+    // enquanto uma tela nossa cobre a TV, o site some (enquetes, chat e banners dele ficavam por cima)
+    'html.' + PREFIX + '-cover body > *:not([id^="' + PREFIX + '-"]){display:none !important}',
+    'streann-inside-polls,.polls-container{display:none !important}',
     '#' + PREFIX + '-login{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2147483642;display:none;',
     '  background:#0b0b0f;color:#fff;font-family:Roboto,Arial,sans-serif;text-align:center}',
     '#' + PREFIX + '-login.open{display:flex;align-items:center;justify-content:center}',
@@ -526,6 +529,7 @@
     closeHome();
     loginOpen = true;
     loginEl.classList.add('open');
+    updateCover();
     setFocus(loginEl.querySelector('.' + PREFIX + '-btn'));
     startCode();
   }
@@ -535,6 +539,7 @@
     clearTimeout(loginTimer);
     clearInterval(loginTick);
     if (loginEl) loginEl.classList.remove('open');
+    updateCover();
     if (current && loginEl && loginEl.contains(current)) current = null;
   }
 
@@ -661,6 +666,7 @@
     player.src = url;
     player.style.display = 'block';
     maximize(player);
+    updateCover();
     var p = player.play();
     if (p && p.catch) p.catch(function () {});
   }
@@ -671,6 +677,7 @@
     player.removeAttribute('src');
     try { player.load(); } catch (err) { /* nada a liberar */ }
     player.style.display = 'none';
+    updateCover();
   }
 
   // ------------------------------------------------------- tela Início
@@ -846,10 +853,17 @@
     return cards.length;
   }
 
+  // Liga/desliga o modo em que só as telas do app aparecem
+  function updateCover() {
+    var on = homeOpen || loginOpen || (!!player && maxVideo === player);
+    document.documentElement.classList.toggle(PREFIX + '-cover', on);
+  }
+
   function openHome() {
     if (!home) buildHome();
     homeOpen = true;
     home.classList.add('open');
+    updateCover();
     var first = home.querySelector('.' + PREFIX + '-hero .' + PREFIX + '-btn') ||
                 home.querySelector('.' + PREFIX + '-card') ||
                 home.querySelector('.' + PREFIX + '-btn');
@@ -859,6 +873,7 @@
   function closeHome() {
     homeOpen = false;
     if (home) home.classList.remove('open');
+    updateCover();
     if (current && home && home.contains(current)) current = null;
   }
 
@@ -1070,7 +1085,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.4.0',
+    version: '0.4.1',
     openItem: openItem,
     codeLogin: openCodeLogin,
     reloadCatalog: loadCatalog,

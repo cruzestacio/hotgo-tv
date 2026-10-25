@@ -30,7 +30,10 @@ async function apiScenario(browser) {
   const calls = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.route('https://www.hotgo.tv/**', (r) => r.fulfill({
-    contentType: 'text/html', body: '<!doctype html><title>hotgo</title><body><streann-root></streann-root></body>'
+    contentType: 'text/html',
+    body: '<!doctype html><title>hotgo</title><body><streann-root><div id="enquete" ' +
+      'style="position:fixed;right:0;bottom:0;width:300px;height:300px;z-index:2147483647;background:#f06">enquete</div>' +
+      '</streann-root></body>'
   }));
   await page.route('https://cf.streann.tech/**', (r) => {
     const req = r.request();
@@ -58,6 +61,8 @@ async function apiScenario(browser) {
   const rows = await page.$$eval('.tvf-row-title', (h) => h.map((x) => x.textContent));
   if (!process.env.FIXTURE) assert.deepStrictEqual(rows, ['Estreias', 'Mais vistos']);
   console.log('linhas do Início:', rows.length, rows.slice(0, 5).join(' | '));
+  // pop-ups do site (como a enquete) não ficam por cima do Início
+  assert.strictEqual(await page.$eval('#enquete', (e) => e.offsetParent === null), true);
   const layout = calls.find((c) => c.path.endsWith('/tab-layout'));
   assert.strictEqual(layout.path, '/web/services/v3/user/tab-layout');
   assert.strictEqual(layout.auth, 'Bearer token-de-teste');
