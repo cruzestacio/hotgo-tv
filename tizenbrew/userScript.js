@@ -602,7 +602,8 @@
           throw err;
         });
       }
-      return res.json();
+      // algumas rotas (como o stop-active-player) respondem 200 sem corpo
+      return res.text().then(function (text) { return text ? JSON.parse(text) : null; });
     });
   }
 
@@ -2072,7 +2073,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.11.4',
+    version: '0.11.5',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,
