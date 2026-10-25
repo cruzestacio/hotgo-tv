@@ -18,6 +18,8 @@ const password = 'hotgotv';
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
 function tizenjs(args, cwd) {
+  // no Windows o npx.cmd roda pelo shell: argumentos com espaço precisam de aspas
+  if (process.platform === 'win32') args = args.map(function (a) { return /\s/.test(a) ? '"' + a + '"' : a; });
   execFileSync(npx, ['-y', '-p', 'github:reisxd/tizen.js', 'tizenjs'].concat(args),
     { cwd: cwd || root, stdio: 'inherit', shell: process.platform === 'win32' });
 }
