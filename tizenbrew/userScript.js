@@ -74,35 +74,45 @@
     '  border-radius:6px;position:relative;z-index:1}',
     'html.' + PREFIX + '-tv ::-webkit-scrollbar{display:none}',
     '#' + PREFIX + '-home{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2147483640;',
-    '  background:#0b0b0f;color:#fff;overflow:hidden;font-family:Roboto,Arial,sans-serif;display:none}',
+    '  background:#141414;color:#fff;overflow:hidden;font-family:Roboto,"Helvetica Neue",Arial,sans-serif;display:none}',
     '#' + PREFIX + '-home.open{display:block}',
+    '@keyframes ' + PREFIX + '-in{from{opacity:0}to{opacity:1}}',
     // a rolagem é por transform (camada da GPU): scrollTop/scrollLeft repintavam a tela toda no Fire TV
     '#' + PREFIX + '-scroll{position:absolute;left:0;top:0;right:0;will-change:transform;',
-    '  transition:transform .15s ease-out}',
-    '.' + PREFIX + '-hero{position:relative;height:52vh;background:#000 center/cover no-repeat}',
-    '.' + PREFIX + '-hero:after{content:"";position:absolute;left:0;right:0;bottom:0;height:60%;',
-    '  background:linear-gradient(transparent,#0b0b0f)}',
-    '.' + PREFIX + '-hero-info{position:absolute;left:4vw;bottom:6vh;z-index:1;max-width:55vw}',
-    '.' + PREFIX + '-hero-title{font-size:3.2vw;font-weight:700;margin:0 0 1.5vh;text-shadow:0 2px 8px #000}',
+    '  transition:transform .2s ease-out;animation:' + PREFIX + '-in .25s ease-out}',
+    // destaque como na Netflix: imagem grande, escurecida à esquerda e embaixo, troca com fade
+    '.' + PREFIX + '-hero{position:relative;height:62vh;background:#000 center top/cover no-repeat;',
+    '  transition:background-image .4s ease-in-out}',
+    '.' + PREFIX + '-hero:before{content:"";position:absolute;left:0;top:0;bottom:0;width:70%;',
+    '  background:linear-gradient(90deg,#141414 0,rgba(20,20,20,.75) 35%,transparent 100%)}',
+    '.' + PREFIX + '-hero:after{content:"";position:absolute;left:0;right:0;bottom:0;height:45%;',
+    '  background:linear-gradient(transparent,#141414)}',
+    '.' + PREFIX + '-hero-info{position:absolute;left:4vw;bottom:9vh;z-index:1;max-width:45vw}',
+    '.' + PREFIX + '-hero-title{font-size:3.4vw;font-weight:800;line-height:1.1;margin:0 0 1.5vh;',
+    '  text-shadow:0 2px 12px rgba(0,0,0,.8)}',
     '.' + PREFIX + '-bar{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;align-items:center;',
     '  padding:2.5vh 4vw;background:linear-gradient(rgba(0,0,0,.85),transparent)}',
     '.' + PREFIX + '-bar.solid{background:#0b0b0f}',
-    '.' + PREFIX + '-logo{font-size:2.2vw;font-weight:800;color:#ff2d55;margin-right:3vw;letter-spacing:.05em}',
-    '.' + PREFIX + '-btn{display:inline-block;background:rgba(255,255,255,.12);color:#fff;border:0;',
-    '  border-radius:6px;padding:1vh 1.6vw;margin-right:1vw;font-size:1.2vw;font-weight:600}',
-    '.' + PREFIX + '-btn.primary{background:#fff;color:#000}',
-    '.' + PREFIX + '-row{margin:0 0 3.5vh}',
-    '.' + PREFIX + '-row-title{font-size:1.6vw;font-weight:700;margin:0 4vw 1.4vh}',
-    '.' + PREFIX + '-track{position:relative;overflow:hidden;padding:1.2vh 0}',
-    '.' + PREFIX + '-rail{display:flex;padding:0 4vw;white-space:nowrap;will-change:transform;',
+    '.' + PREFIX + '-logo{font-size:2.2vw;font-weight:900;color:#e50914;margin-right:3vw;letter-spacing:.05em}',
+    '.' + PREFIX + '-btn{display:inline-block;background:rgba(109,109,110,.7);color:#fff;border:0;',
+    '  border-radius:4px;padding:1.1vh 1.8vw;margin-right:1vw;font-size:1.25vw;font-weight:700;',
     '  transition:transform .15s ease-out}',
-    '.' + PREFIX + '-card{position:relative;flex:0 0 auto;width:18vw;margin-right:1vw;border-radius:6px;overflow:hidden;',
-    '  background:#1c1c24;opacity:.55}',
-    // card focado: moldura branca por dentro (o contorno por fora era cortado pela linha) e título em destaque
-    '.' + PREFIX + '-card.' + PREFIX + '-focus{outline:none !important;opacity:1;z-index:2}',
+    '.' + PREFIX + '-btn.primary{background:#fff;color:#000}',
+    '.' + PREFIX + '-btn.' + PREFIX + '-focus{outline:.25vw solid #fff !important;outline-offset:.25vw !important;',
+    '  transform:scale(1.06)}',
+    '.' + PREFIX + '-row{margin:0 0 2.5vh}',
+    '.' + PREFIX + '-row-title{font-size:1.5vw;font-weight:700;color:#e5e5e5;margin:0 4vw .6vh}',
+    // folga em cima e embaixo para o card focado crescer sem ser cortado pela linha
+    '.' + PREFIX + '-track{position:relative;overflow:hidden;padding:2.2vh 0}',
+    '.' + PREFIX + '-rail{display:flex;padding:0 4vw;white-space:nowrap;will-change:transform;',
+    '  transition:transform .2s ease-out}',
+    '.' + PREFIX + '-card{position:relative;flex:0 0 auto;width:18vw;margin-right:.8vw;border-radius:4px;overflow:hidden;',
+    '  background:#232323;opacity:.7;transition:transform .15s ease-out,opacity .15s}',
+    // card focado: cresce um pouco, moldura branca por dentro e título em destaque
+    '.' + PREFIX + '-card.' + PREFIX + '-focus{outline:none !important;opacity:1;z-index:2;transform:scale(1.08)}',
     '.' + PREFIX + '-card.' + PREFIX + '-focus:after{content:"";position:absolute;left:0;top:0;right:0;bottom:0;',
     '  border:.35vw solid #fff;border-radius:6px;pointer-events:none}',
-    '.' + PREFIX + '-card.' + PREFIX + '-focus .' + PREFIX + '-card-title{background:#ff2d55;color:#fff;font-weight:700}',
+    '.' + PREFIX + '-card.' + PREFIX + '-focus .' + PREFIX + '-card-title{background:#e50914;color:#fff;font-weight:700}',
     '.' + PREFIX + '-thumb{width:100%;padding-top:56.25%;background:#222 center/cover no-repeat}',
     '.' + PREFIX + '-card-title{font-size:1vw;padding:.8vh .8vw;overflow:hidden;text-overflow:ellipsis;',
     '  white-space:nowrap;color:#ddd}',
@@ -115,10 +125,11 @@
     '#' + PREFIX + '-home.' + PREFIX + '-nav-open .' + PREFIX + '-nav .' + PREFIX + '-logo{opacity:1}',
     '.' + PREFIX + '-nav-item{display:flex;align-items:center;height:5.6vh;padding:0 1.2vw;color:#999;',
     '  font-size:1.3vw;white-space:nowrap;border-radius:0 6px 6px 0}',
-    '.' + PREFIX + '-nav-item.active{color:#fff;font-weight:700;box-shadow:inset .3vw 0 0 #ff2d55}',
-    '.' + PREFIX + '-nav-item.' + PREFIX + '-focus{outline:none !important;background:#ff2d55;color:#fff}',
-    '.' + PREFIX + '-nav-icon{flex:0 0 auto;width:3vw;height:3.6vh;margin-right:1.2vw;display:flex;align-items:center;',
-    '  justify-content:center;font-size:1.4vw;font-weight:800;background:center/contain no-repeat}',
+    '.' + PREFIX + '-nav-item.active{color:#fff;font-weight:700;box-shadow:inset .3vw 0 0 #e50914}',
+    '.' + PREFIX + '-nav-item.' + PREFIX + '-focus{outline:none !important;background:#fff;color:#000}',
+    '.' + PREFIX + '-nav-icon{flex:0 0 auto;width:2vw;height:2vw;margin:0 1.6vw 0 .6vw}',
+    '.' + PREFIX + '-nav-icon svg{width:100%;height:100%;display:block}',
+    '.' + PREFIX + '-card.' + PREFIX + '-brand .' + PREFIX + '-thumb{padding-top:70%;background-size:cover}',
     '.' + PREFIX + '-nav-label{opacity:0;transition:opacity .15s}',
     '#' + PREFIX + '-home.' + PREFIX + '-nav-open .' + PREFIX + '-nav-label{opacity:1}',
     '.' + PREFIX + '-has-nav .' + PREFIX + '-rail{padding-left:8vw}',
@@ -136,6 +147,7 @@
     '.' + PREFIX + '-key .' + PREFIX + '-card-title{font-size:1.5vw;text-align:center;padding:1vh 0;color:#fff}',
     '.' + PREFIX + '-search-box{font-size:1.8vw;margin:0 0 2vh 8vw;padding:1.4vh 1.2vw;background:#1c1c24;',
     '  border-radius:6px;width:34vw;color:#fff}',
+    '.' + PREFIX + '-card .' + PREFIX + '-progress{height:.6vh;margin:0;border-radius:0}',
     '#' + PREFIX + '-toast{position:fixed;left:50%;bottom:6vh;transform:translateX(-50%);z-index:2147483647;',
     '  background:rgba(20,20,26,.95);color:#fff;font:600 1.3vw Roboto,Arial,sans-serif;padding:1.4vh 2vw;',
     '  border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none}',
@@ -578,7 +590,7 @@
       var brand = brands[L.order || 0];
       if (!name && brand) name = (brand.name || '').trim();
       if (!name) return;
-      out.push({ name: name, icon: L.icon || '', categoryId: L.categoryId, order: L.order || 0 });
+      out.push({ name: name, img: (brand && brand.image) || L.icon || '', categoryId: L.categoryId, order: L.order || 0 });
     });
     return out.sort(function (a, b) { return a.order - b.order; });
   }
@@ -747,8 +759,77 @@
     return !!(v.canPlayType('application/vnd.apple.mpegurl') || v.canPlayType('application/x-mpegURL'));
   }
 
+  // ------------------------------------- Minha lista e Continuar assistindo
+  // Ficam guardados no aparelho (localStorage da WebView), como o perfil local de um app de TV.
+
+  var LIST_KEY = 'tvfMyList';
+  var HISTORY_KEY = 'tvfHistory';
+  var lastPlayed = null;
+
+  function loadJson(key) {
+    try { return JSON.parse(window.localStorage.getItem(key) || '[]') || []; } catch (err) { return []; }
+  }
+
+  function saveJson(key, value) {
+    try { window.localStorage.setItem(key, JSON.stringify(value)); } catch (err) { /* sem espaço: segue sem guardar */ }
+  }
+
+  function slim(item) {
+    return { id: item.id, type: item.type || 'vod', title: item.title, img: item.img, backdrop: item.backdrop };
+  }
+
+  function inList(id) {
+    return loadJson(LIST_KEY).some(function (it) { return it.id === id; });
+  }
+
+  function toggleList(item) {
+    if (!item || !item.id || !item.img) return;
+    var list = loadJson(LIST_KEY).filter(function (it) { return it.id !== item.id; });
+    var added = list.length === loadJson(LIST_KEY).length;
+    if (added) list.unshift(slim(item));
+    saveJson(LIST_KEY, list.slice(0, 200));
+    toast(added ? 'Adicionado à Minha lista' : 'Removido da Minha lista');
+    updateListButton();
+    if (!added && page.key === 'list') refresh();
+  }
+
+  function remember(item, pos, dur) {
+    var hist = loadJson(HISTORY_KEY).filter(function (h) { return h.id !== item.id; });
+    var h = slim(item);
+    h.pos = pos || 0;
+    h.dur = dur || 0;
+    h.at = Date.now();
+    hist.unshift(h);
+    saveJson(HISTORY_KEY, hist.slice(0, 40));
+  }
+
+  // O player (nativo ou o nosso <video>) avisa onde parou; quase no fim conta como assistido
+  function playerClosed(posMs, durMs) {
+    if (!lastPlayed) return;
+    var pos = Math.max(0, Number(posMs) || 0) / 1000;
+    var dur = Math.max(0, Number(durMs) || 0) / 1000;
+    if (dur && pos > dur * 0.95) pos = -1;
+    remember(lastPlayed, pos, dur);
+    if (homeOpen && page.key === 'home') refresh();
+  }
+
+  function continueItems() {
+    return loadJson(HISTORY_KEY).filter(function (h) { return h.pos > 0; }).map(function (h) {
+      h.progress = h.dur ? Math.min(1, h.pos / h.dur) : 0;
+      return h;
+    });
+  }
+
   function openItem(item) {
     closeHome();
+    lastPlayed = item;
+    // de qualquer lugar que o vídeo seja aberto, ele continua de onde parou
+    var start = item.pos > 0 ? item.pos : 0;
+    var dur = item.dur || 0;
+    loadJson(HISTORY_KEY).forEach(function (h) {
+      if (h.id === item.id && !start && h.pos > 0) { start = h.pos; dur = h.dur; }
+    });
+    if (accessToken()) remember(item, start, dur);
     if (!accessToken()) { openCodeLogin(); return; }
     if (!window.HotGoNative && !canPlayHls()) { sitePlayer(item); return; }
     var dataType = item.type === 'vod' ? 'videoondemand' : item.type;
@@ -767,7 +848,7 @@
       });
     }).then(function (res) {
       if (!res || !res.url) throw new Error('playlist sem url');
-      playUrl(res.url, item.title);
+      playUrl(res.url, item.title, start);
     }).catch(function (err) {
       if (window.console) console.warn('[hotgoTV] player próprio falhou, usando o do site:', err.message);
       if (err.status === 401) {
@@ -778,11 +859,13 @@
     });
   }
 
-  function playUrl(url, title) {
-    // No app do Fire TV, o vídeo vai para o player nativo (ExoPlayer)
+  function playUrl(url, title, start) {
+    // No app do Fire TV, o vídeo vai para o player nativo (ExoPlayer), já do ponto em que parou
     if (window.HotGoNative && window.HotGoNative.play) {
       try {
-        if (window.HotGoNative.play(url, title || '')) return;
+        if (start && window.HotGoNative.playFrom) {
+          if (window.HotGoNative.playFrom(url, title || '', String(Math.floor(start * 1000)))) return;
+        } else if (window.HotGoNative.play(url, title || '')) return;
       } catch (err) { /* cai no <video> */ }
     }
     if (!player) {
@@ -796,6 +879,12 @@
     }
     player.title = title || '';
     player.src = url;
+    if (start) {
+      player.addEventListener('loadedmetadata', function seekOnce() {
+        player.removeEventListener('loadedmetadata', seekOnce);
+        try { player.currentTime = start; } catch (err) { /* começa do início */ }
+      });
+    }
     player.style.display = 'block';
     maximize(player);
     updateCover();
@@ -805,6 +894,7 @@
 
   function stopPlayer() {
     if (!player) return;
+    if (player.currentSrc) playerClosed(player.currentTime * 1000, (isFinite(player.duration) ? player.duration : 0) * 1000);
     player.pause();
     player.removeAttribute('src');
     try { player.load(); } catch (err) { /* nada a liberar */ }
@@ -903,6 +993,12 @@
     if (item.group) meta.push(item.group);
     if (item.duration) meta.push(Math.round(item.duration / 60) + ' min');
     hero.querySelector('.' + PREFIX + '-hero-meta').textContent = meta.join('  ·  ');
+    updateListButton();
+  }
+
+  function updateListButton() {
+    var b = home && home.querySelector('.' + PREFIX + '-list-btn');
+    if (b && heroItem) b.textContent = inList(heroItem.id) ? '✓ Minha lista' : '+ Minha lista';
   }
 
   function heroFollow(e) {
@@ -929,6 +1025,13 @@
     // as capas carregam conforme o foco chega perto (loadThumbs)
     if (item.img) card.setAttribute(PREFIX + '-img', item.img);
     card.appendChild(el('div', PREFIX + '-thumb'));
+    if (item.progress) {
+      var bar = el('div', PREFIX + '-progress');
+      var fill = el('div');
+      fill.style.width = Math.round(item.progress * 100) + '%';
+      bar.appendChild(fill);
+      card.appendChild(bar);
+    }
     card.appendChild(el('div', PREFIX + '-card-title', item.title));
     card.onclick = function () {
       if (item.open) item.open();
@@ -975,7 +1078,14 @@
     var play = el('button', PREFIX + '-btn primary', '▶ Assistir');
     play.onclick = function () { openCard(heroItem); };
     heroInfo.appendChild(play);
-    homeGrid.push([play]);
+    var heroRow = [play];
+    if (hasNav()) {
+      var listBtn = el('button', PREFIX + '-btn ' + PREFIX + '-list-btn', '+ Minha lista');
+      listBtn.onclick = function () { toggleList(heroItem); };
+      heroInfo.appendChild(listBtn);
+      heroRow.push(listBtn);
+    }
+    homeGrid.push(heroRow);
     hero.appendChild(heroInfo);
     scroll.appendChild(hero);
     heroItem = null;
@@ -995,17 +1105,27 @@
     return onHotgo() && !!catalog;
   }
 
+  // ícones de linha do menu (SVG, herdam a cor do texto)
+  var ICONS = {
+    search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4.2-4.2"/>',
+    home: '<path d="M3 11.5L12 4l9 7.5V20h-6v-5H9v5H3z"/>',
+    channels: '<rect x="3" y="7" width="18" height="12" rx="2"/><path d="M8 3l4 4 4-4"/>',
+    categories: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+    list: '<path d="M12 5v14M5 12h14"/>'
+  };
+
   function buildNav() {
     var nav = el('nav', PREFIX + '-nav');
     nav.appendChild(el('div', PREFIX + '-logo', 'HOTGO'));
     var active = page.navKey || page.key;
-    var add = function (key, icon, label, iconUrl) {
+    var add = function (key, label) {
       var b = el('div', PREFIX + '-nav-item' + (active === key ? ' active' : ''));
       b.setAttribute('tabindex', '-1');
       b.setAttribute(PREFIX + '-focusable', '');
       b.setAttribute(PREFIX + '-n', navItems.length);
-      var i = el('span', PREFIX + '-nav-icon', iconUrl ? '' : icon);
-      if (iconUrl) i.style.backgroundImage = 'url("' + iconUrl.replace(/"/g, '%22') + '")';
+      var i = el('span', PREFIX + '-nav-icon');
+      i.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+        'stroke-linecap="round" stroke-linejoin="round">' + ICONS[key] + '</svg>';
       b.appendChild(i);
       b.appendChild(el('span', PREFIX + '-nav-label', label));
       b.tvfPage = key;
@@ -1013,10 +1133,11 @@
       navItems.push(b);
       nav.appendChild(b);
     };
-    add('search', '🔍', 'Buscar');
-    add('home', '🏠', 'Início');
-    menu.forEach(function (ch) { add('ch:' + ch.categoryId, ch.name.charAt(0), ch.name, ch.icon); });
-    add('categories', '☰', 'Categorias');
+    add('search', 'Buscar');
+    add('home', 'Início');
+    if (menu.length) add('channels', 'Canais');
+    add('categories', 'Categorias');
+    add('list', 'Minha lista');
     home.appendChild(nav);
   }
 
@@ -1048,11 +1169,13 @@
     if (page.key === key) { focusContent(); return; }
     if (key === 'search') page = { key: 'search', query: '', results: [] };
     else if (key === 'categories') page = { key: 'categories' };
+    else if (key === 'list') page = { key: 'list' };
+    else if (key === 'channels') page = { key: 'channels' };
     else if (key.indexOf('ch:') === 0) {
       var id = key.slice(3);
       var ch = null;
       menu.forEach(function (m) { if (m.categoryId === id) ch = m; });
-      page = gridPage(key, ch ? ch.name : '', id);
+      page = gridPage(key, ch ? ch.name : '', id, 'channels');
     } else page = { key: 'home' };
     buildHome();
     openHome();
@@ -1185,8 +1308,31 @@
     if (page.key === 'home') {
       var first = catalog[0] && catalog[0].items[0];
       catalog.forEach(function (r) { r.items.forEach(function (it) { it.group = r.title; }); });
-      renderHero(scroll, first);
+      var cont = continueItems();
+      var mine = loadJson(LIST_KEY);
+      renderHero(scroll, cont[0] || first);
+      if (cont.length) addRow(scroll, 'Continuar assistindo', cont);
+      if (mine.length) addRow(scroll, 'Minha lista', mine);
       catalog.forEach(function (r) { addRow(scroll, r.title, r.items); });
+      return;
+    }
+    if (page.key === 'channels') {
+      scroll.appendChild(el('h1', PREFIX + '-page-title', 'Canais'));
+      addGrid(scroll, menu.map(function (ch) {
+        return { title: ch.name, img: ch.img, open: function () { goPage('ch:' + ch.categoryId); } };
+      }), 'brand');
+      return;
+    }
+    if (page.key === 'list') {
+      scroll.appendChild(el('h1', PREFIX + '-page-title', 'Minha lista'));
+      var items = loadJson(LIST_KEY);
+      if (items.length) addGrid(scroll, items);
+      else message(scroll, 'Sua lista está vazia. Num vídeo, aperte o botão Menu (☰) do controle para adicionar.');
+      var seen = loadJson(HISTORY_KEY);
+      if (seen.length) {
+        scroll.appendChild(el('h2', PREFIX + '-row-title', 'Assistidos recentemente'));
+        addGrid(scroll, seen);
+      }
       return;
     }
     if (page.key === 'search') {
@@ -1325,7 +1471,13 @@
 
   function toggleHome() {
     if (loginOpen) closeCodeLogin();
-    if (homeOpen && appMode()) return;
+    // no modo app o botão Menu (☰) guarda/tira da Minha lista o vídeo focado
+    if (homeOpen && appMode()) {
+      var it = current && current.tvfItem;
+      if (it && it.id && it.img && !it.open) toggleList(it);
+      else if (current && closest(current, '.' + PREFIX + '-hero')) toggleList(heroItem);
+      return;
+    }
     if (homeOpen) { closeHome(); firstFocus(); return; }
     buildHome();
     openHome();
@@ -1584,8 +1736,10 @@
   }
 
   window.hotgoTV = {
-    version: '0.7.0',
+    version: '0.8.0',
     openItem: openItem,
+    playerClosed: playerClosed,
+    toggleList: toggleList,
     codeLogin: openCodeLogin,
     reloadCatalog: loadCatalog,
     toggleHome: toggleHome,

@@ -49,7 +49,10 @@ class PlayerActivity : Activity() {
             .build()
         exo.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_ENDED) finish()
+                if (state == Player.STATE_ENDED) {
+                    lastResult = longArrayOf(exo.duration, exo.duration)
+                    finish()
+                }
             }
 
             override fun onPlayerError(error: PlaybackException) {
@@ -72,6 +75,8 @@ class PlayerActivity : Activity() {
     override fun onStop() {
         player?.let {
             intent.putExtra(EXTRA_POSITION, it.currentPosition)
+            // a WebView lê isso ao voltar, para o "Continuar assistindo"
+            lastResult = longArrayOf(it.currentPosition, it.duration.coerceAtLeast(0))
             it.release()
         }
         player = null
@@ -110,11 +115,17 @@ class PlayerActivity : Activity() {
         private const val FAST_MS = 30_000L
         private const val CONTROLLER_TIMEOUT_MS = 3_000
 
-        fun start(context: Context, url: String, title: String) {
+        /** Posição e duração (ms) de quando o player fechou; MainActivity consome no onResume. */
+        @Volatile
+        var lastResult: LongArray? = null
+
+        fun start(context: Context, url: String, title: String, startMs: Long = 0L) {
+            lastResult = null
             context.startActivity(
                 Intent(context, PlayerActivity::class.java)
                     .putExtra(EXTRA_URL, url)
                     .putExtra(EXTRA_TITLE, title)
+                    .putExtra(EXTRA_POSITION, startMs.coerceAtLeast(0L))
             )
         }
     }

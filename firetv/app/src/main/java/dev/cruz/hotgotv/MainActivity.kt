@@ -175,11 +175,16 @@ class MainActivity : Activity() {
     /** Chamado pelo overlay (window.HotGoNative) para tocar o HLS no player nativo. */
     inner class NativeBridge {
         @JavascriptInterface
-        fun play(url: String, title: String?): Boolean {
+        fun play(url: String, title: String?): Boolean = playFrom(url, title, "0")
+
+        /** Igual a play, começando em startMs (o "Continuar assistindo" do overlay). */
+        @JavascriptInterface
+        fun playFrom(url: String, title: String?, startMs: String?): Boolean {
             val page = currentUrl?.let(Uri::parse)?.host ?: return false
             val video = Uri.parse(url)
             if (!isHotgoHost(page) || video.scheme != "https") return false
-            runOnUiThread { PlayerActivity.start(this@MainActivity, url, title.orEmpty()) }
+            val start = startMs?.toLongOrNull() ?: 0L
+            runOnUiThread { PlayerActivity.start(this@MainActivity, url, title.orEmpty(), start) }
             return true
         }
 
@@ -200,6 +205,10 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         web.onResume()
+        PlayerActivity.lastResult?.let { (pos, dur) ->
+            PlayerActivity.lastResult = null
+            js("window.hotgoTV && window.hotgoTV.playerClosed($pos, $dur)")
+        }
     }
 
     override fun onPause() {

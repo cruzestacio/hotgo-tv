@@ -97,7 +97,7 @@ async function apiScenario(browser) {
       op: f && getComputedStyle(f).opacity, otherOp: other && getComputedStyle(other).opacity };
   });
   assert.ok(look.f, 'nenhum card focado');
-  assert.strictEqual(look.title, 'rgb(255, 45, 85)');
+  assert.strictEqual(look.title, 'rgb(229, 9, 20)');
   assert.ok(Number(look.op) > Number(look.otherOp));
   await press(page, 'Enter');
   await page.waitForFunction(() => {
@@ -152,10 +152,12 @@ async function apiScenario(browser) {
   await press(page, 'ArrowLeft', 3);
   assert.strictEqual(await page.$eval('#tvf-home', (h) => h.classList.contains('tvf-nav-open')), true);
   const navLabels = await page.$$eval('.tvf-nav-label', (l) => l.map((x) => x.textContent));
-  assert.deepStrictEqual(navLabels, ['Buscar', 'Início', 'Outro', 'Categorias']);
+  assert.deepStrictEqual(navLabels, ['Buscar', 'Início', 'Canais', 'Categorias', 'Minha lista']);
   assert.match(await focused(page), /Início/);
-  // canal: grade de 5 colunas, carrega mais vídeos perto do fim e Voltar volta ao Início
+  // Canais lista as marcas; cada uma abre uma grade de 5 colunas que carrega mais vídeos perto do fim
   await press(page, 'ArrowDown');
+  await press(page, 'Enter');
+  assert.strictEqual(await focused(page), 'Outro');
   await press(page, 'Enter');
   await page.waitForFunction(() => document.querySelectorAll('.tvf-card').length === 30, null, { timeout: 3000 });
   assert.strictEqual(await page.$eval('.tvf-page-title', (h) => h.textContent), 'Outro');
@@ -164,9 +166,22 @@ async function apiScenario(browser) {
   await page.waitForFunction(() => document.querySelectorAll('.tvf-card').length === 45, null, { timeout: 3000 });
   await press(page, 'ArrowRight', 2);
   assert.strictEqual(await focused(page), 'Canal 28');
+  // Menu (☰) guarda o vídeo focado na Minha lista
+  await page.evaluate(() => window.hotgoTV.toggleHome());
+  assert.strictEqual(await page.$eval('#tvf-toast', (t) => t.textContent), 'Adicionado à Minha lista');
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 10009, bubbles: true })));
+  await page.waitForTimeout(100);
+  assert.strictEqual(await page.$eval('.tvf-page-title', (h) => h.textContent), 'Canais');
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 10009, bubbles: true })));
   await page.waitForTimeout(100);
   assert.strictEqual(await page.$$eval('.tvf-hero', (h) => h.length), 1);
+  const homeRows = await page.$$eval('.tvf-row-title', (h) => h.map((x) => x.textContent));
+  assert.deepStrictEqual(homeRows.slice(0, 2), ['Minha lista', 'Estreias']);
+  // o player avisa onde parou: o vídeo entra em "Continuar assistindo" com a barra de progresso
+  await page.evaluate(() => window.hotgoTV.playerClosed(60000, 600000));
+  await page.waitForTimeout(100);
+  assert.strictEqual(await page.$eval('.tvf-row-title', (h) => h.textContent), 'Continuar assistindo');
+  assert.strictEqual(await page.$eval('.tvf-row .tvf-progress div', (d) => d.style.width), '10%');
   // categorias: só as ativas; abrir uma mostra os vídeos dela, e Voltar volta para Categorias
   await press(page, 'ArrowLeft', 3);
   await press(page, 'ArrowDown', 2);
