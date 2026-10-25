@@ -92,6 +92,7 @@ async function codeLoginScenario(browser) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const errors = [];
   let polls = 0;
+  let confirmed = false; // vira true quando o teste "confirma o código no celular"
   page.on('pageerror', (e) => errors.push(e.message));
   await page.route('https://www.hotgo.tv/**', (r) => r.fulfill({
     contentType: 'text/html', body: '<!doctype html><title>hotgo</title><body><streann-root></streann-root></body>'
@@ -103,7 +104,7 @@ async function codeLoginScenario(browser) {
     if (u.pathname.includes('/smartTv/login/code/123456/')) {
       assert.strictEqual(r.request().headers()['authorization'].length, 64);
       polls++;
-      if (polls < 2) return r.fulfill({ headers: cors(), body: '' });
+      if (!confirmed) return r.fulfill({ headers: cors(), body: '' });
       return r.fulfill({ headers: cors(), json: { access_token: 'tok-codigo', refresh_token: 'ref', expires_in: 3600 } });
     }
     return r.fulfill({ status: 404, headers: cors(), body: '{}' });
@@ -129,6 +130,8 @@ async function codeLoginScenario(browser) {
   }
   await page.waitForFunction(() => document.getElementById('tvf-code').textContent === '123456', null, { timeout: 3000 });
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'login-code.png') });
+  assert.strictEqual(await page.evaluate(() => localStorage.getItem('access_token')), null);
+  confirmed = true;
   await page.waitForFunction(() => localStorage.getItem('access_token') === 'tok-codigo', null, { timeout: 15000 });
   await page.waitForFunction(() => localStorage.getItem('userId') === 'user1', null, { timeout: 3000 });
   assert.strictEqual(await page.evaluate(() => localStorage.getItem('remeberMe')), 'true');
