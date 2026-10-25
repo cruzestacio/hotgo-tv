@@ -42,8 +42,9 @@ class PlayerActivity : Activity() {
         view = PlayerView(this).apply {
             keepScreenOn = true
             controllerShowTimeoutMs = CONTROLLER_TIMEOUT_MS
-            setShowFastForwardButton(true)
-            setShowRewindButton(true)
+            // as setas já voltam/avançam; na barra fica só o play/pausa no centro, como no YouTube
+            setShowFastForwardButton(false)
+            setShowRewindButton(false)
             setShowNextButton(false)
             setShowPreviousButton(false)
         }
@@ -125,27 +126,42 @@ class PlayerActivity : Activity() {
         super.onStop()
     }
 
+    /**
+     * Controle como no YouTube/Netflix: as setas e o OK sempre agem no vídeo, sem passear pelos
+     * botões da barra. Esquerda/direita voltam/avançam (segurar acelera: 10 s, 30 s, 60 s),
+     * OK pausa/continua, cima/baixo só mostram os controles.
+     */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val exo = player ?: return super.dispatchKeyEvent(event)
-        // Com a barra escondida, as setas e o OK já agem no vídeo sem precisar abrir a barra antes
-        if (event.action == KeyEvent.ACTION_DOWN && !view.isControllerFullyVisible) {
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_LEFT -> { exo.seekBack(); view.showController(); return true }
-                KeyEvent.KEYCODE_DPAD_RIGHT -> { exo.seekForward(); view.showController(); return true }
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                    exo.playWhenReady = !exo.playWhenReady
-                    view.showController()
-                    return true
-                }
-            }
+        val code = event.keyCode
+        if (code !in VIDEO_KEYS) return super.dispatchKeyEvent(event)
+        if (event.action != KeyEvent.ACTION_DOWN) return true
+        when (code) {
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> seekBy(exo, -stepFor(event, code))
+            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> seekBy(exo, stepFor(event, code))
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> if (event.repeatCount == 0) exo.playWhenReady = !exo.playWhenReady
+            KeyEvent.KEYCODE_MEDIA_PLAY -> exo.playWhenReady = true
+            KeyEvent.KEYCODE_MEDIA_PAUSE -> exo.playWhenReady = false
         }
-        if (event.action == KeyEvent.ACTION_DOWN) {
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { exo.seekTo(exo.currentPosition + FAST_MS); view.showController(); return true }
-                KeyEvent.KEYCODE_MEDIA_REWIND -> { exo.seekTo((exo.currentPosition - FAST_MS).coerceAtLeast(0)); view.showController(); return true }
-            }
+        view.showController()
+        return true
+    }
+
+    private fun stepFor(event: KeyEvent, code: Int): Long {
+        if (code == KeyEvent.KEYCODE_MEDIA_REWIND || code == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD) return FAST_MS
+        return when {
+            event.repeatCount < 3 -> SEEK_MS
+            event.repeatCount < 12 -> FAST_MS
+            else -> FASTER_MS
         }
-        return view.dispatchKeyEvent(event) || super.dispatchKeyEvent(event)
+    }
+
+    private fun seekBy(exo: ExoPlayer, delta: Long) {
+        val duration = exo.duration
+        var target = (exo.currentPosition + delta).coerceAtLeast(0L)
+        if (duration > 0) target = target.coerceAtMost((duration - 1_000L).coerceAtLeast(0L))
+        exo.seekTo(target)
     }
 
     companion object {
@@ -154,6 +170,13 @@ class PlayerActivity : Activity() {
         private const val EXTRA_POSITION = "position"
         private const val SEEK_MS = 10_000L
         private const val FAST_MS = 30_000L
+        private const val FASTER_MS = 60_000L
+        private val VIDEO_KEYS = setOf(
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY,
+            KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_MEDIA_REWIND
+        )
         private const val CONTROLLER_TIMEOUT_MS = 5_000
 
         /** Posição e duração (ms) de quando o player fechou; MainActivity consome no onResume. */

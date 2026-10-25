@@ -160,11 +160,22 @@
     '.' + PREFIX + '-tile .' + PREFIX + '-thumb,.' + PREFIX + '-key .' + PREFIX + '-thumb{display:none}',
     '.' + PREFIX + '-tile .' + PREFIX + '-card-title{font-size:1.5vw;font-weight:700;padding:5vh 1vw;text-align:center;margin:0;max-height:none;',
     '  white-space:normal;color:#fff}',
-    '.' + PREFIX + '-has-nav .' + PREFIX + '-card.' + PREFIX + '-key{width:4.4vw;margin-right:.6vw}',
-    '.' + PREFIX + '-has-nav .' + PREFIX + '-card.' + PREFIX + '-key.wide{width:9.4vw}',
+    '.' + PREFIX + '-has-nav .' + PREFIX + '-card.' + PREFIX + '-key{width:4.6vw;margin-right:.5vw}',
+    '.' + PREFIX + '-has-nav .' + PREFIX + '-card.' + PREFIX + '-key.wide{width:10vw}',
+    '.' + PREFIX + '-row.' + PREFIX + '-kb-row{margin:0}',
+    '.' + PREFIX + '-kb-row .' + PREFIX + '-track{padding:.5vh 0}',
+    '.' + PREFIX + '-key.' + PREFIX + '-focus{background:#fff !important}',
+    '.' + PREFIX + '-key.' + PREFIX + '-focus .' + PREFIX + '-card-title{color:#000}',
+    '.' + PREFIX + '-has-nav .' + PREFIX + '-card.' + PREFIX + '-chip{width:auto;margin-right:.8vw;background:#272727;',
+    '  border-radius:3vh;padding:0 1.6vw}',
+    '.' + PREFIX + '-chip .' + PREFIX + '-thumb{display:none}',
+    '.' + PREFIX + '-chip .' + PREFIX + '-card-title{margin:0;line-height:5.4vh;font-size:1.3vw;color:#fff;white-space:nowrap}',
+    '.' + PREFIX + '-chip.' + PREFIX + '-focus{background:#fff !important}',
+    '.' + PREFIX + '-chip.' + PREFIX + '-focus .' + PREFIX + '-card-title{color:#000}',
+    '.' + PREFIX + '-kb-row .' + PREFIX + '-row-title{margin-top:1.5vh}',
     '.' + PREFIX + '-key .' + PREFIX + '-card-title{font-size:1.5vw;text-align:center;padding:1vh 0;margin:0;color:#fff}',
-    '.' + PREFIX + '-search-box{font-size:1.8vw;margin:0 0 2vh 8vw;padding:1.4vh 1.2vw;background:#1c1c24;',
-    '  border-radius:6px;width:34vw;color:#fff}',
+    '.' + PREFIX + '-search-box{font-size:1.7vw;margin:5vh 0 1.5vh 8vw;padding:0 2vw;height:6.7vh;line-height:6.7vh;',
+    '  background:#272727;border-radius:3.4vh;width:37.5vw;color:#fff;box-sizing:border-box;overflow:hidden;white-space:nowrap}',
     '.' + PREFIX + '-thumb .' + PREFIX + '-progress{position:absolute;left:0;right:0;bottom:0;height:.6vh;margin:0;border-radius:0}',
     '#' + PREFIX + '-toast{position:fixed;left:50%;bottom:6vh;transform:translateX(-50%);z-index:2147483647;',
     '  background:rgba(20,20,26,.95);color:#fff;font:600 1.3vw Roboto,Arial,sans-serif;padding:1.4vh 2vw;',
@@ -1314,6 +1325,47 @@
 
   var KEYBOARD = ['abcdefg', 'hijklmn', 'opqrstu', 'vwxyz12', '3456789', '0'];
 
+  function fold(t) {
+    t = String(t || '').toLowerCase();
+    try { t = t.normalize('NFD').replace(/[̀-ͯ]/g, ''); } catch (err) { /* sem normalize */ }
+    return t;
+  }
+
+  // Sugestões locais e instantâneas: categorias, canais e palavras dos títulos do catálogo.
+  // A busca do HotGo só acha palavras inteiras ("lat" não acha nada, "latina" acha).
+  var searchTerms = null;
+  function terms() {
+    if (searchTerms && searchTerms.cats === !!categories) return searchTerms.list;
+    var seen = {};
+    var list = [];
+    var add = function (t, weight) {
+      t = String(t || '').trim();
+      var k = fold(t);
+      if (k.length < 3 || seen[k]) return;
+      seen[k] = true;
+      list.push({ text: t, key: k, weight: weight });
+    };
+    (categories || []).forEach(function (c) { add(c.title, 0); });
+    menu.forEach(function (m) { add(m.name, 1); });
+    (catalog || []).forEach(function (r) {
+      r.items.forEach(function (it) {
+        String(it.title || '').split(/[^A-Za-zÀ-ÿ0-9]+/).forEach(function (w) { if (w.length >= 4) add(w.toLowerCase(), 2); });
+      });
+    });
+    searchTerms = { cats: !!categories, list: list };
+    return list;
+  }
+
+  function suggestFor(q) {
+    var k = fold(q).trim();
+    if (k.length < 2) return [];
+    var out = terms().filter(function (t) {
+      return t.key.indexOf(k) === 0 || t.key.indexOf(' ' + k) !== -1;
+    });
+    out.sort(function (a, b) { return a.weight - b.weight || a.key.length - b.key.length; });
+    return out.slice(0, 8).map(function (t) { return t.text; });
+  }
+
   function typeKey(ch) {
     var p = page;
     if (ch === 'del') p.query = p.query.slice(0, -1);
@@ -1321,24 +1373,72 @@
     else p.query += ch;
     var box = document.getElementById(PREFIX + '-search-box');
     if (box) box.textContent = p.query || 'Digite para buscar';
+    p.suggestions = suggestFor(p.query);
+    showResults(p);
     clearTimeout(p.timer);
-    p.timer = setTimeout(function () { runSearch(p); }, 700);
+    p.timer = setTimeout(function () { runSearch(p); }, 600);
   }
 
-  function runSearch(p) {
+  function searchWith(p, term) {
+    p.query = term;
+    var box = document.getElementById(PREFIX + '-search-box');
+    if (box) box.textContent = term;
+    clearTimeout(p.timer);
+    runSearch(p, true);
+  }
+
+  function itemsFrom(res) {
+    var list = Array.isArray(res) ? res : res && (res.items || res.content || res.results || res.hits ||
+      (res.data && (res.data.items || res.data))) || [];
+    var out = [];
+    (Array.isArray(list) ? list : []).forEach(function (v) {
+      if (v && !v.image && (v.thumbnail || v.poster || v.posterImage)) v.image = v.thumbnail || v.poster || v.posterImage;
+      if (v && !v.id && v.contentId) v.id = v.contentId;
+      if (v && !v.name && v.title) v.name = v.title;
+      var it = toItem(v);
+      if (it) { it.group = 'Busca'; out.push(it); }
+    });
+    return out;
+  }
+
+  // Busca nova do site (content-search, com o token da conta); se não der, a antiga, por palavra inteira
+  function serverSearch(q) {
+    var old = function () {
+      return api('POST', '/web/services/external/search/content', {}, { 'device-type': 'web', query: q }, true).then(itemsFrom);
+    };
+    var token = accessToken();
+    if (!token) return old();
+    return fetch('https://content-search.services.c1.streann.com/v1/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ lang: lang(), query: q })
+    }).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }).then(itemsFrom).then(function (items) {
+      return items.length ? items : old();
+    }, old);
+  }
+
+  function runSearch(p, exact) {
     var q = p.query.trim();
-    if (q.length < 2) { p.results = []; p.searched = ''; showResults(p); return; }
-    api('POST', '/web/services/external/search/content', {}, { 'device-type': 'web', query: q }, true).then(function (list) {
+    if (q.length < 3) { p.results = []; p.searched = ''; showResults(p); return; }
+    p.loadingQ = q;
+    serverSearch(q).then(function (items) {
+      // palavra pela metade ("lat"): busca pela primeira sugestão ("latinas")
+      if (!items.length && !exact && p.suggestions && p.suggestions[0] && fold(p.suggestions[0]) !== fold(q)) {
+        var alt = p.suggestions[0];
+        return serverSearch(alt).then(function (more) { return { items: more, term: alt }; });
+      }
+      return { items: items, term: q };
+    }).then(function (r) {
       if (p.query.trim() !== q) return;
-      p.results = [];
-      (Array.isArray(list) ? list : (list && list.items) || []).forEach(function (v) {
-        var it = toItem(v);
-        if (it) { it.group = 'Busca'; p.results.push(it); }
-      });
-      p.searched = q;
+      p.results = r.items;
+      p.searched = r.term;
       showResults(p);
     }, function (err) {
       if (window.console) console.warn('[hotgoTV] busca falhou:', err.message);
+      if (p.query.trim() !== q) return;
       p.results = [];
       p.searched = q;
       showResults(p);
@@ -1346,11 +1446,17 @@
   }
 
   function renderResults(scroll, p) {
-    if (p.results.length) {
-      scroll.appendChild(el('h2', PREFIX + '-row-title ' + PREFIX + '-results', 'Resultados da pesquisa para "' + p.searched + '"'));
-      addGrid(scroll, p.results, null, PREFIX + '-results');
+    if (p.suggestions && p.suggestions.length) {
+      var chips = addRow(scroll, null, p.suggestions.map(function (t) {
+        return { title: t, open: function () { searchWith(p, t); } };
+      }), 'chip', PREFIX + '-results ' + PREFIX + '-kb-row');
+      chips.insertBefore(el('h2', PREFIX + '-row-title', 'Sugestões'), chips.firstChild);
     }
-    else if (p.searched) message(scroll, 'Nada encontrado para "' + p.searched + '"', PREFIX + '-results');
+    if (p.results.length) {
+      addRow(scroll, 'Resultados da pesquisa para "' + p.searched + '"', p.results, null, PREFIX + '-results');
+    } else if (p.searched) {
+      message(scroll, 'Nada encontrado para "' + p.searched + '"', PREFIX + '-results');
+    }
   }
 
   function showResults(p) {
@@ -1363,6 +1469,8 @@
     renderResults(scroll, p);
     indexGrid();
     loadThumbs(p.kbRows, 0);
+    // se o foco estava numa sugestão ou num resultado que saiu, volta para o teclado
+    if (current && !document.contains(current)) setFocus(homeGrid[p.kbRows - 1][0]);
   }
 
   function renderPage(scroll) {
@@ -1407,21 +1515,21 @@
       return;
     }
     if (page.key === 'search') {
-      scroll.appendChild(el('h1', PREFIX + '-page-title', 'Buscar'));
       var box = el('div', PREFIX + '-search-box', page.query || 'Digite para buscar');
       box.id = PREFIX + '-search-box';
       scroll.appendChild(box);
       KEYBOARD.forEach(function (keys) {
         addRow(scroll, null, keys.split('').map(function (k) {
           return { title: k, open: function () { typeKey(k); } };
-        }), 'key');
+        }), 'key', PREFIX + '-kb-row');
         homeGrid[homeGrid.length - 1].keepCol = true;
       });
       addRow(scroll, null, [
         { title: 'Espaço', cls: 'wide', open: function () { typeKey(' '); } },
         { title: 'Apagar', cls: 'wide', open: function () { typeKey('del'); } },
         { title: 'Limpar', cls: 'wide', open: function () { typeKey('clear'); } }
-      ], 'key');
+      ], 'key', PREFIX + '-kb-row');
+      if (!categories) loadCategories();
       page.kbRows = homeGrid.length;
       renderResults(scroll, page);
       return;
@@ -1565,6 +1673,8 @@
     // a fileira focada encaixa sempre na mesma altura; a próxima só espia embaixo
     var top = home.classList.contains(PREFIX + '-has-nav') ? 0.12 : 0.3;
     var y = row ? Math.max(0, row.offsetTop - window.innerHeight * top) : 0;
+    // na busca o teclado fica parado na tela; só os resultados fazem a tela subir
+    if (row && row.classList.contains(PREFIX + '-kb-row')) y = 0;
     if (scroll.tvfY !== y) {
       scroll.tvfY = y;
       scroll.style.transform = 'translate3d(0,' + (-y) + 'px,0)';
@@ -1819,10 +1929,11 @@
   }
 
   window.hotgoTV = {
-    version: '0.10.0',
+    version: '0.11.0',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,
+    typeKey: function (k) { if (page.key === 'search') typeKey(k); },
     codeLogin: openCodeLogin,
     reloadCatalog: loadCatalog,
     toggleHome: toggleHome,

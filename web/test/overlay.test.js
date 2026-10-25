@@ -213,9 +213,14 @@ async function apiScenario(browser) {
   await press(page, 'Enter');
   await press(page, 'ArrowRight');
   await press(page, 'Enter');
-  assert.strictEqual(await page.$eval('#tvf-search-box', (b) => b.textContent), 'ab');
+  await press(page, 'ArrowRight');
+  await press(page, 'Enter');
+  assert.strictEqual(await page.$eval('#tvf-search-box', (b) => b.textContent), 'abc');
   await page.waitForFunction(() => document.querySelectorAll('.tvf-results .tvf-card').length === 1, null, { timeout: 3000 });
-  assert.strictEqual(await page.$eval('.tvf-results .tvf-card-title', (t) => t.textContent), 'Achado ab');
+  assert.strictEqual(await page.$eval('.tvf-results .tvf-card-title', (t) => t.textContent), 'Achado abc');
+  // sugestões instantâneas para palavra pela metade ("loi" -> categoria Loiras)
+  await page.evaluate(() => { for (let i = 0; i < 3; i++) window.hotgoTV.typeKey('del'); ['l', 'o', 'i'].forEach((k) => window.hotgoTV.typeKey(k)); });
+  assert.deepStrictEqual(await page.$$eval('.tvf-chip .tvf-card-title', (c) => c.map((x) => x.textContent)), ['Loiras']);
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'search.png') });
 
   assert.deepStrictEqual(errors, []);
