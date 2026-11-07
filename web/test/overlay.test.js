@@ -237,6 +237,13 @@ async function apiScenario(browser) {
   await press(page, 'ArrowRight');
   await press(page, 'Enter');
   assert.strictEqual(await page.$eval('#tvf-search-box', (b) => b.textContent), 'abc');
+  // trocar de linha no teclado não pode deslocar as linhas: a 1ª tecla de cada uma fica no mesmo lugar
+  await press(page, 'ArrowDown');
+  await press(page, 'ArrowDown');
+  await press(page, 'ArrowRight', 4);
+  await press(page, 'ArrowUp', 2);
+  const kbLefts = await page.$$eval('.tvf-kb-row .tvf-key:first-child', (k) => k.map((x) => Math.round(x.getBoundingClientRect().left)));
+  assert.strictEqual(new Set(kbLefts).size, 1, 'teclado desalinhado: ' + kbLefts.join(','));
   await page.waitForFunction(() => document.querySelectorAll('.tvf-results .tvf-card').length === 1, null, { timeout: 3000 });
   assert.strictEqual(await page.$eval('.tvf-results .tvf-card-title', (t) => t.textContent), 'Achado abc');
   // sugestões instantâneas para palavra pela metade ("loi" -> categoria Loiras)
