@@ -1,4 +1,4 @@
-// Gera o banner (320x180) e o ícone (96x96) do launcher do Fire TV e o ícone (512x423) do atalho da Samsung.
+// Gera o banner (320x180) e o ícone (96x96) do launcher do Fire TV e o ícone (512x423) do app da Samsung.
 // Uso: node scripts/make-icons.js
 const path = require('path');
 const { chromium } = require('playwright');
@@ -19,6 +19,6 @@ const art = (w, h, size, text) => `<html><body style="margin:0"><div style="widt
   await page.screenshot({ path: path.join(RES, 'mipmap-xhdpi', 'ic_launcher.png') });
   await page.setViewportSize({ width: 512, height: 423 });
   await page.setContent(art(512, 423, 92, 'HotGo<br><span style="color:#fff">TV</span>').replace('justify-content:center', 'justify-content:center;text-align:center;line-height:1.1;flex-direction:column'));
-  await page.screenshot({ path: path.join(__dirname, '..', 'tizen', 'launcher', 'icon.png') });
+  await page.screenshot({ path: path.join(__dirname, '..', 'tizen', 'app', 'icon.png') });
   await browser.close();
 })();

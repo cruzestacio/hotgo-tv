@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A versão (__VERSION__) é preenchida pelo scripts/build-tizen-app.js a partir do package.json -->
+<widget xmlns:tizen="http://tizen.org/ns/widgets" xmlns="http://www.w3.org/ns/widgets" id="https://github.com/cruzestacio/hotgo-tv" version="__VERSION__" viewmodes="maximized">
+    <!-- mesmo id do antigo atalho do TizenBrew: instalar por cima troca o atalho pelo app, no mesmo lugar da tela inicial -->
+    <tizen:application id="HotGoTVLnc.HotGoTV" package="HotGoTVLnc" required_version="3.0"/>
+    <content src="index.html"/>
+    <icon src="icon.png"/>
+    <name>HotGo TV</name>
+    <access origin="*" subdomains="true"/>
+    <feature name="http://tizen.org/feature/screen.size.all"/>
+    <tizen:privilege name="http://tizen.org/privilege/internet"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    <tizen:profile name="tv-samsung"/>
+    <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
+</widget>

@@ -1,16 +1,17 @@
-// Empacota e assina o atalho da Samsung (tizen/launcher) como hotgo-tv-samsung.wgt, sem Tizen Studio.
+// Empacota e assina o app da Samsung (tizen/app + o overlay) como hotgo-tv-samsung.wgt, sem Tizen Studio.
 // Usa o tizen.js (github:reisxd/tizen.js), o mesmo do TizenBrew Installer: certificado de autor Tizen
 // próprio + distribuidor público do SDK, que as TVs com Tizen até 6.5 aceitam no modo desenvolvedor.
-// O certificado de autor fica fora do repositório (padrão: ~/.hotgo-tv/author.p12). Para atualizar o
-// atalho instalado, use o mesmo certificado; com outro, desinstale o atalho antes.
-// Uso: node scripts/build-tizen-launcher.js [pasta-do-certificado]
+// O certificado de autor fica fora do repositório (padrão: ~/.hotgo-tv/author.p12; no CI vem do segredo
+// HOTGO_TIZEN_AUTHOR_P12_B64). Para instalar por cima do app que já está na TV, use o mesmo certificado;
+// com outro, a TV recusa e é preciso desinstalar antes (e o login se perde).
+// Uso: node scripts/build-tizen-app.js [pasta-do-certificado]
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
-const src = path.join(root, 'tizen', 'launcher');
+const { stage } = require('./tizen-app-stage');
 const out = path.join(root, 'hotgo-tv-samsung.wgt');
 const certDir = process.argv[2] || path.join(os.homedir(), '.hotgo-tv');
 const cert = path.join(certDir, 'author.p12');
@@ -63,7 +64,10 @@ async function createAuthorCert() {
 
 (async () => {
   if (!fs.existsSync(cert)) await createAuthorCert();
+  const dir = stage();
+  if (fs.existsSync(out)) fs.unlinkSync(out);
   execFileSync(process.execPath, [path.join(tizenDir, 'cli.js'), 'build', '.', '-t', 'wgt', '-o', out,
-    '--author', cert, '--authorPwd', password, '-p', 'public'], { cwd: src, stdio: 'inherit' });
-  console.log('gerado', path.relative(root, out));
+    '--author', cert, '--authorPwd', password, '-p', 'public'], { cwd: dir, stdio: 'inherit' });
+  fs.rmSync(dir, { recursive: true, force: true });
+  console.log('gerado', path.relative(root, out), '(' + require('../package.json').version + ')');
 })().catch((err) => { console.error(err); process.exit(1); });
