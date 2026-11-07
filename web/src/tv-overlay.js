@@ -408,7 +408,9 @@
     if (prev) prev.classList.remove(PREFIX + '-row-focus');
     if (row) row.classList.add(PREFIX + '-row-focus');
     var rail = prev && prev.querySelector('.' + PREFIX + '-rail');
-    if (rail && rail.tvfCard && rail.firstChild) {
+    // teclado e grades mantêm a coluna: deslocar a linha que perde o foco desalinha as teclas
+    var grid = rail && rail.tvfCard && homeGrid[Number(rail.tvfCard.getAttribute(PREFIX + '-r'))];
+    if (rail && rail.tvfCard && rail.firstChild && !(grid && grid.keepCol)) {
       var x = Math.max(0, rail.tvfCard.offsetLeft - rail.firstChild.offsetLeft);
       rail.tvfX = x;
       rail.style.transform = 'translate3d(' + (-x) + 'px,0,0)';
@@ -2424,7 +2426,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.13.0',
+    version: '0.13.3',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,
