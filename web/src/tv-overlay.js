@@ -562,6 +562,13 @@
   }
 
   // O site gera um id aleatório por aparelho e manda em toda reprodução
+  // nome do aparelho na página da conta: o mesmo código roda no Fire TV, na Samsung e no navegador
+  function deviceLabel() {
+    if (window.tizen || standalone()) return 'Samsung TV (Tizen)';
+    if (window.HotGoNative) return 'Fire TV';
+    return 'Navegador';
+  }
+
   function deviceId() {
     var d = store('device');
     if (!d || d === 'null') {
@@ -1298,7 +1305,7 @@
       if (u.email || u.username) lines.push(['E-mail', u.email || u.username]);
       lines.push(['Assinatura', subscriptionText(account && account.sub)]);
     }
-    lines.push(['Aparelho', 'Fire TV · ' + deviceId().slice(0, 10)]);
+    lines.push(['Aparelho', deviceLabel() + ' · ' + deviceId().slice(0, 10)]);
     lines.push(['Versão do app', window.hotgoTV ? window.hotgoTV.version : '']);
     lines.forEach(function (l) {
       var line = el('div', PREFIX + '-account-line');
@@ -2437,7 +2444,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.14.0',
+    version: '0.14.1',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,
