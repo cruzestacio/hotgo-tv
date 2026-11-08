@@ -527,7 +527,12 @@
   // ------------------------------------------------- API do HotGo (Streann)
 
   function onHotgo() {
-    return /(^|\.)hotgo\.tv$/.test(window.location.hostname) || !!window.hotgoTVForceApi;
+    return /(^|\.)hotgo\.tv$/.test(window.location.hostname) || !!window.hotgoTVForceApi || standalone();
+  }
+
+  // App Samsung próprio (tizen/app): roda fora do site, então nada de navegar para páginas do hotgo.tv
+  function standalone() {
+    return !!window.hotgoTVStandalone;
   }
 
   function store(key) {
@@ -558,6 +563,13 @@
   }
 
   // O site gera um id aleatório por aparelho e manda em toda reprodução
+  // nome do aparelho na página da conta: o mesmo código roda no Fire TV, na Samsung e no navegador
+  function deviceLabel() {
+    if (window.tizen || standalone()) return 'Samsung TV (Tizen)';
+    if (window.HotGoNative) return 'Fire TV';
+    return 'Navegador';
+  }
+
   function deviceId() {
     var d = store('device');
     if (!d || d === 'null') {
@@ -845,7 +857,7 @@
       window.location.href = window.location.origin + '/' + lang() + '/login';
     };
     box.appendChild(again);
-    box.appendChild(email);
+    if (!standalone()) box.appendChild(email);
     loginEl.appendChild(box);
     document.body.appendChild(loginEl);
   }
@@ -932,7 +944,8 @@
     storeSession(token);
     var go = function () {
       closeCodeLogin();
-      window.location.href = window.location.origin + '/' + lang() + '/home';
+      if (standalone()) window.location.reload();
+      else window.location.href = window.location.origin + '/' + lang() + '/home';
     };
     api('GET', '/web/services/user', {}).then(function (user) {
       try {
@@ -944,6 +957,7 @@
   }
 
   function sitePlayer(item) {
+    if (standalone()) { toast('Não consegui abrir este vídeo. Tente de novo.', 5000); return; }
     window.location.href = window.location.origin + '/' + lang() + '/player/' + item.type + '/' + item.id;
   }
 
@@ -1082,7 +1096,8 @@
     }).catch(function (err) {
       if (window.console) console.warn('[hotgoTV] player próprio falhou:', err.message, err.status || '');
       if (err.status === 401) {
-        window.location.href = window.location.origin + '/' + lang() + '/login';
+        if (standalone()) openCodeLogin();
+        else window.location.href = window.location.origin + '/' + lang() + '/login';
         return;
       }
       // no modo app o site fica escondido (e o player dele quebra sem o <video>): avisa e fica no Início
@@ -1291,7 +1306,7 @@
       if (u.email || u.username) lines.push(['E-mail', u.email || u.username]);
       lines.push(['Assinatura', subscriptionText(account && account.sub)]);
     }
-    lines.push(['Aparelho', 'Fire TV · ' + deviceId().slice(0, 10)]);
+    lines.push(['Aparelho', deviceLabel() + ' · ' + deviceId().slice(0, 10)]);
     lines.push(['Versão do app', window.hotgoTV ? window.hotgoTV.version : '']);
     lines.forEach(function (l) {
       var line = el('div', PREFIX + '-account-line');
@@ -2264,6 +2279,8 @@
 
   // Retorna true quando o "voltar" foi tratado aqui; o app nativo decide o resto.
   function back() {
+    // no app Samsung próprio não há site por baixo do login: sem sessão, Voltar pede para sair
+    if (loginOpen && standalone() && !accessToken()) return exitApp();
     if (loginOpen) { closeCodeLogin(); firstFocus(); return true; }
     if (maxVideo) {
       var v = maxVideo;
@@ -2292,6 +2309,7 @@
     if (homeOpen) { closeHome(); firstFocus(); return true; }
     if (appMode() && !loginOpen) { buildHome(); openHome(); return true; }
     if (isTextInput(document.activeElement)) { document.activeElement.blur(); return true; }
+    if (standalone()) return exitApp();
     return false;
   }
 
@@ -2417,7 +2435,7 @@
     // sem sessão, o app começa pelo login por código (a não ser que a pessoa tenha pedido e-mail e senha)
     var emailLogin = false;
     try { emailLogin = window.sessionStorage.getItem('tvfEmailLogin') === '1'; } catch (err) { emailLogin = false; }
-    if (onHotgo() && !accessToken() && !emailLogin) setTimeout(openCodeLogin, 300);
+    if (onHotgo() && !accessToken() && (!emailLogin || standalone())) setTimeout(openCodeLogin, 300);
     maybeAutoHome();
     setTimeout(function () { if (!current) firstFocus(); }, 800);
     // no Fire TV, tira a tela de abertura nativa (o login por código abre em 300 ms)
@@ -2427,7 +2445,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.13.3',
+    version: '0.14.1',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,

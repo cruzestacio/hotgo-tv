@@ -1,7 +1,7 @@
 {
   "name": "hotgo-tv",
-  "version": "0.13.3",
-  "description": "Interface de TV estilo Netflix para o HotGo, para Fire TV e Samsung (TizenBrew)",
+  "version": "0.14.1",
+  "description": "Interface de TV estilo Netflix para o HotGo, para Fire TV e Samsung (Tizen)",
   "license": "MIT",
   "keywords": ["tizenbrew"],
   "packageType": "mods",
@@ -14,7 +14,7 @@
   ],
   "files": ["tizenbrew/userScript.js"],
   "scripts": {
-    "test": "node scripts/build-tizenbrew.js --check && node web/test/overlay.test.js",
+    "test": "node scripts/build-tizenbrew.js --check && node web/test/overlay.test.js && node web/test/tizen-app.test.js",
     "build:tizenbrew": "node scripts/build-tizenbrew.js",
     "icons": "node scripts/make-icons.js"
   },
