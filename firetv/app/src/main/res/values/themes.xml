@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.HotGoTV" parent="android:Theme.Black.NoTitleBar.Fullscreen">
-        <item name="android:windowBackground">@android:color/black</item>
+        <!-- mesma cor da tela de abertura, para não piscar preto antes dela -->
+        <item name="android:windowBackground">@color/splash_bg</item>
     </style>
 </resources>

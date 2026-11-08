@@ -3,10 +3,15 @@ package dev.cruz.hotgotv
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.graphics.Color
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.util.TypedValue
 import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
@@ -24,8 +29,6 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
-import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 
@@ -236,20 +239,20 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun buildSplash(): View = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        gravity = Gravity.CENTER
-        setBackgroundColor(Color.rgb(15, 15, 15))
+    // Mesma abertura do app da Samsung (tizen/app/index.html): "HotGo" vermelho e "TV" branco, centralizados
+    private fun buildSplash(): View = FrameLayout(this).apply {
+        setBackgroundColor(SPLASH_BG)
+        val logo = SpannableString("HotGo TV").apply {
+            setSpan(ForegroundColorSpan(Color.rgb(255, 45, 85)), 0, 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            setSpan(ForegroundColorSpan(Color.WHITE), 6, 8, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
         addView(TextView(context).apply {
-            text = "HOTGO"
-            setTextColor(Color.rgb(229, 9, 20))
-            textSize = 56f
-            paint.isFakeBoldText = true
-            letterSpacing = 0.08f
-        })
-        addView(ProgressBar(context).apply { isIndeterminate = true },
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-                .apply { topMargin = 48 })
+            text = logo
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, resources.displayMetrics.widthPixels * 0.06f)
+            letterSpacing = 0.05f
+            includeFontPadding = false
+        }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
     }
 
     private fun hideSplash() {
@@ -300,6 +303,7 @@ class MainActivity : Activity() {
     companion object {
         private const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
         private const val SPLASH_MAX_MS = 25_000L
+        private val SPLASH_BG = Color.rgb(11, 11, 15)
 
         private val BLOCKED_HOSTS = listOf(
             "doubleclick.net", "googletagmanager.com", "google-analytics.com", "connect.facebook.net",

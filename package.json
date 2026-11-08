@@ -1,6 +1,6 @@
 {
   "name": "hotgo-tv",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "Interface de TV estilo Netflix para o HotGo, para Fire TV e Samsung (Tizen)",
   "license": "MIT",
   "keywords": ["tizenbrew"],

@@ -2445,7 +2445,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.14.1',
+    version: '0.14.2',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,
