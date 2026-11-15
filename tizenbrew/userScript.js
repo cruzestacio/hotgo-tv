@@ -1142,7 +1142,8 @@
       player.addEventListener('playing', function () { setSpinner(false); });
       player.addEventListener('seeked', function () { if (!player.paused) setSpinner(false); });
       player.addEventListener('canplay', function () { if (player.paused) setSpinner(false); });
-      player.addEventListener('pause', function () { if (maxVideo === player) showOsd(); });
+      // pausar deixa só o vídeo na tela; os controles aparecem com a seta para baixo
+      player.addEventListener('pause', function () { if (maxVideo === player) hideOsd(); });
       // no fim, volta para onde o vídeo foi aberto (o "Continuar assistindo" marca como visto)
       player.addEventListener('ended', function () { if (maxVideo === player) back(); });
       document.body.appendChild(player);
@@ -2115,7 +2116,8 @@
     restore();
     maxVideo = v;
     v.classList.add(PREFIX + '-max');
-    showOsd();
+    // o vídeo começa com a tela limpa; seta para baixo ou para os lados mostram os controles
+    hideOsd();
   }
 
   function restore() {
@@ -2199,9 +2201,7 @@
   }
 
   function hideOsd() {
-    var v = activeVideo();
-    // pausado, os controles ficam na tela (como no YouTube)
-    if (v && v.paused && maxVideo) { osdTimer = setTimeout(hideOsd, OSD_TIMEOUT); return; }
+    clearTimeout(osdTimer);
     clearInterval(osdTick);
     if (osd) osd.classList.remove('show');
   }
@@ -2226,7 +2226,8 @@
     } else {
       v.pause();
     }
-    showOsd();
+    // pausar ou continuar deixa a tela limpa; a seta para baixo mostra os controles
+    hideOsd();
     return true;
   }
 
@@ -2347,7 +2348,8 @@
     if (maxVideo) {
       if (k === KEY.LEFT) { seekStep(-1); stop(e); return; }
       if (k === KEY.RIGHT) { seekStep(1); stop(e); return; }
-      if (k === KEY.UP || k === KEY.DOWN) { showOsd(); stop(e); return; }
+      if (k === KEY.DOWN) { showOsd(); stop(e); return; }
+      if (k === KEY.UP) { stop(e); return; }
       if (k === KEY.ENTER) { if (!e.repeat) playPause(); stop(e); return; }
     }
 
@@ -2445,7 +2447,7 @@
   }
 
   window.hotgoTV = {
-    version: '0.14.2',
+    version: '0.15.0',
     openItem: openItem,
     playerClosed: playerClosed,
     toggleList: toggleList,
