@@ -42,6 +42,8 @@ class PlayerActivity : Activity() {
         view = PlayerView(this).apply {
             keepScreenOn = true
             controllerShowTimeoutMs = CONTROLLER_TIMEOUT_MS
+            // pausado fica só o vídeo; os controles não aparecem sozinhos (só com a seta para baixo)
+            controllerAutoShow = false
             // as setas já voltam/avançam; na barra fica só o play/pausa no centro, como no YouTube
             setShowFastForwardButton(false)
             setShowRewindButton(false)
@@ -129,23 +131,37 @@ class PlayerActivity : Activity() {
     /**
      * Controle como no YouTube/Netflix: as setas e o OK sempre agem no vídeo, sem passear pelos
      * botões da barra. Esquerda/direita voltam/avançam (segurar acelera: 10 s, 30 s, 60 s),
-     * OK pausa/continua, cima/baixo só mostram os controles.
+     * OK pausa/continua deixando a tela limpa, e só a seta para baixo mostra os controles.
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val exo = player ?: return super.dispatchKeyEvent(event)
         val code = event.keyCode
+        // com os controles na tela, Voltar só os esconde (como no YouTube); de novo, sai do vídeo
+        if (code == KeyEvent.KEYCODE_BACK && view.isControllerFullyVisible) {
+            if (event.action == KeyEvent.ACTION_UP) view.hideController()
+            return true
+        }
         if (code !in VIDEO_KEYS) return super.dispatchKeyEvent(event)
         if (event.action != KeyEvent.ACTION_DOWN) return true
         when (code) {
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> seekBy(exo, -stepFor(event, code))
-            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> seekBy(exo, stepFor(event, code))
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                seekBy(exo, -stepFor(event, code)); view.showController()
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                seekBy(exo, stepFor(event, code)); view.showController()
+            }
+            KeyEvent.KEYCODE_DPAD_DOWN -> view.showController()
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> if (event.repeatCount == 0) exo.playWhenReady = !exo.playWhenReady
-            KeyEvent.KEYCODE_MEDIA_PLAY -> exo.playWhenReady = true
-            KeyEvent.KEYCODE_MEDIA_PAUSE -> exo.playWhenReady = false
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> if (event.repeatCount == 0) setPlaying(exo, !exo.playWhenReady)
+            KeyEvent.KEYCODE_MEDIA_PLAY -> setPlaying(exo, true)
+            KeyEvent.KEYCODE_MEDIA_PAUSE -> setPlaying(exo, false)
         }
-        view.showController()
         return true
+    }
+
+    private fun setPlaying(exo: ExoPlayer, playing: Boolean) {
+        exo.playWhenReady = playing
+        view.hideController()
     }
 
     private fun stepFor(event: KeyEvent, code: Int): Long {
@@ -177,7 +193,7 @@ class PlayerActivity : Activity() {
             KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY,
             KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_MEDIA_REWIND
         )
-        private const val CONTROLLER_TIMEOUT_MS = 5_000
+        private const val CONTROLLER_TIMEOUT_MS = 3_500
 
         /** Posição e duração (ms) de quando o player fechou; MainActivity consome no onResume. */
         @Volatile
