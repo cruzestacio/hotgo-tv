@@ -136,6 +136,11 @@ class PlayerActivity : Activity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val exo = player ?: return super.dispatchKeyEvent(event)
         val code = event.keyCode
+        // com os controles na tela, Voltar só os esconde (como no YouTube); de novo, sai do vídeo
+        if (code == KeyEvent.KEYCODE_BACK && view.isControllerFullyVisible) {
+            if (event.action == KeyEvent.ACTION_UP) view.hideController()
+            return true
+        }
         if (code !in VIDEO_KEYS) return super.dispatchKeyEvent(event)
         if (event.action != KeyEvent.ACTION_DOWN) return true
         when (code) {
@@ -188,7 +193,7 @@ class PlayerActivity : Activity() {
             KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY,
             KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_MEDIA_REWIND
         )
-        private const val CONTROLLER_TIMEOUT_MS = 5_000
+        private const val CONTROLLER_TIMEOUT_MS = 3_500
 
         /** Posição e duração (ms) de quando o player fechou; MainActivity consome no onResume. */
         @Volatile

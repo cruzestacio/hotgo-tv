@@ -19,7 +19,7 @@
 
   var PREFIX = 'tvf';
   var SEEK_STEP = 10;
-  var OSD_TIMEOUT = 5000;
+  var OSD_TIMEOUT = 3500;
   var MIN_CARDS_FOR_HOME = 6;
 
   // Configuração pública que o próprio site do HotGo usa (main-es2015.*.js)
@@ -2283,6 +2283,8 @@
     // no app Samsung próprio não há site por baixo do login: sem sessão, Voltar pede para sair
     if (loginOpen && standalone() && !accessToken()) return exitApp();
     if (loginOpen) { closeCodeLogin(); firstFocus(); return true; }
+    // com os controles na tela, Voltar só os esconde (como no YouTube); de novo, sai do vídeo
+    if (maxVideo && osd && osd.classList.contains('show')) { hideOsd(); return true; }
     if (maxVideo) {
       var v = maxVideo;
       restore();
